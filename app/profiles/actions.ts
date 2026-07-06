@@ -4,9 +4,12 @@ import { revalidatePath } from "next/cache";
 import { getSupabaseServerClient } from "@/lib/supabase";
 import { rematchAllTenders } from "@/lib/match";
 
+// One entry per line — comma-splitting breaks on values that contain commas
+// themselves, which real OCDS category names do (e.g. "Computer programming,
+// consultancy and related activities" is a single category, not two).
 function parseList(value: FormDataEntryValue | null): string[] {
   return (value?.toString() ?? "")
-    .split(",")
+    .split("\n")
     .map((s) => s.trim())
     .filter(Boolean);
 }

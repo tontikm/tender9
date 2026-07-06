@@ -233,12 +233,14 @@ h1 {
 }
 
 .form-field input[type="text"],
-.form-field input[type="number"] {
+.form-field input[type="number"],
+.form-field textarea {
   padding: 7px 10px;
   border: 1px solid #ddd;
   border-radius: 6px;
   font-size: 14px;
   font-family: inherit;
+  resize: vertical;
 }
 
 .form-field .hint {
