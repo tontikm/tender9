@@ -29,22 +29,23 @@ function ProfileForm({ profile }: { profile: Profile | null }) {
         </div>
 
         <div className="form-field full">
-          <label>Keywords (comma-separated)</label>
-          <input type="text" name="keywords" defaultValue={profile?.keywords?.join(", ") ?? ""} />
+          <label>Keywords (one per line)</label>
+          <textarea name="keywords" rows={4} defaultValue={profile?.keywords?.join("\n") ?? ""} />
           <span className="hint">Matched against tender title (2 pts) and description (1 pt).</span>
         </div>
 
         <div className="form-field full">
-          <label>Categories (comma-separated, must match exactly)</label>
-          <input type="text" name="categories" defaultValue={profile?.categories?.join(", ") ?? ""} />
+          <label>Categories (one per line, must match exactly)</label>
+          <textarea name="categories" rows={4} defaultValue={profile?.categories?.join("\n") ?? ""} />
           <span className="hint">
-            e.g. Supplies: Computer Equipment, Information and communication (+2 pts on exact match)
+            e.g. Supplies: Computer Equipment (one full category name per line — some category
+            names contain commas, so don&apos;t split them) (+2 pts on exact match)
           </span>
         </div>
 
         <div className="form-field full">
-          <label>Provinces (comma-separated, leave blank for national)</label>
-          <input type="text" name="provinces" defaultValue={profile?.provinces?.join(", ") ?? ""} />
+          <label>Provinces (one per line, leave blank for national)</label>
+          <textarea name="provinces" rows={2} defaultValue={profile?.provinces?.join("\n") ?? ""} />
         </div>
 
         <div className="form-field">
