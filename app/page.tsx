@@ -1,5 +1,5 @@
 import { getSupabaseServerClient } from "@/lib/supabase";
-import { updateMatchStatus } from "./actions";
+import { updateMatchStatus, generateDraft } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +16,12 @@ interface TenderRow {
   currency: string | null;
   closing_date: string | null;
   document_urls: string[] | null;
+}
+
+interface DraftRow {
+  tender_id: string;
+  content: string;
+  created_at: string;
 }
 
 interface MatchRow {
@@ -116,6 +122,12 @@ export default async function HomePage({
 
   const { data: matches, error } = await query.returns<MatchRow[]>();
 
+  const { data: drafts } = await supabase
+    .from("tender_drafts")
+    .select("tender_id, content, created_at")
+    .returns<DraftRow[]>();
+  const draftsByTenderId = new Map((drafts ?? []).map((d) => [d.tender_id, d]));
+
   return (
     <main>
       <nav className="page-nav">
@@ -147,6 +159,7 @@ export default async function HomePage({
       {matches?.map((match) => {
         const tender = match.tenders;
         if (!tender) return null;
+        const draft = draftsByTenderId.get(tender.id);
 
         return (
           <article className="match-card" key={match.id}>
@@ -190,6 +203,20 @@ export default async function HomePage({
                 <form action={updateMatchStatus.bind(null, match.id, "dismissed")}>
                   <button type="submit">Dismiss</button>
                 </form>
+                {match.status === "saved" && (
+                  <form action={generateDraft.bind(null, tender.id)}>
+                    <button type="submit">{draft ? "Regenerate draft" : "Draft response"}</button>
+                  </form>
+                )}
+              </div>
+            )}
+
+            {match.status === "saved" && draft && (
+              <div className="draft-block">
+                <p className="draft-meta">
+                  Drafted {new Date(draft.created_at).toLocaleString("en-ZA")}
+                </p>
+                <pre className="draft-content">{draft.content}</pre>
               </div>
             )}
           </article>

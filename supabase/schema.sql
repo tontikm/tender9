@@ -54,6 +54,16 @@ create table if not exists tender_matches (
   unique (tender_id, profile_id)
 );
 
+-- Drafted response narratives (Claude-generated cover letter / EOI text).
+-- One draft per tender — regenerating overwrites the previous draft.
+create table if not exists tender_drafts (
+  id uuid primary key default gen_random_uuid(),
+  tender_id uuid references tenders(id) on delete cascade unique,
+  content text not null,
+  model text,
+  created_at timestamptz default now()
+);
+
 -- Ingestion run log
 create table if not exists ingestion_runs (
   id uuid primary key default gen_random_uuid(),
@@ -74,6 +84,7 @@ create table if not exists ingestion_runs (
 alter table tenders enable row level security;
 alter table matching_profiles enable row level security;
 alter table tender_matches enable row level security;
+alter table tender_drafts enable row level security;
 alter table ingestion_runs enable row level security;
 
 -- Starter matching profile, tuned against real eTenders OCDS categories

@@ -23,7 +23,7 @@ npm install
 
 1. In your Supabase project dashboard, go to **SQL Editor → New query**.
 2. Paste the entire contents of `supabase/schema.sql` and run it.
-3. Confirm four tables now exist: `tenders`, `matching_profiles`, `tender_matches`, `ingestion_runs` — and that a starter row exists in `matching_profiles`.
+3. Confirm five tables now exist: `tenders`, `matching_profiles`, `tender_matches`, `tender_drafts`, `ingestion_runs` — and that a starter row exists in `matching_profiles`.
 
 ### 3. Environment variables
 
@@ -35,6 +35,8 @@ Fill in:
 - `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` — from Supabase Project Settings → API
 - `SUPABASE_SERVICE_ROLE_KEY` — same page, the service_role secret. **Never commit this.**
 - `CRON_SECRET` — any random string (`openssl rand -hex 16`), protects the ingest endpoint from public access
+- `ANTHROPIC_API_KEY` — from https://console.anthropic.com/settings/keys, powers the "Draft response"
+  button on saved tenders. Optional: without it, drafting saves a visible error instead of crashing.
 
 ### 4. IMPORTANT — verify the OCDS API details before running
 
@@ -71,7 +73,13 @@ check `tenders` / `tender_matches` for results.
 3. Add the same environment variables from `.env.local` in Vercel's project settings (Environment Variables).
 4. Deploy. The `vercel.json` cron config will automatically run `/api/ingest` hourly once deployed — Vercel Cron only runs on deployed projects, not locally.
 
-## Next steps (Phase 2+)
+## Response drafting
 
-See `tender-system-full-spec.md` for the full roadmap — dashboard, company
-profile, fixed-form filling, and Claude API narrative drafting come next.
+On any tender you've marked **Saved**, a "Draft response" button generates a
+cover-letter/EOI narrative via the Claude API (`lib/draft.ts`), stored in
+`tender_drafts` (one draft per tender — regenerating overwrites it).
+
+## Next steps
+
+Fixed-form filling (auto-populating standard SBD forms) is the remaining
+item from the original roadmap.

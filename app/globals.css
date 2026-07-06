@@ -178,6 +178,30 @@ h1 {
   background: #f0f0f0;
 }
 
+.draft-block {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #eee;
+}
+
+.draft-meta {
+  font-size: 12px;
+  color: #888;
+  margin: 0 0 8px;
+}
+
+.draft-content {
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  background: #fafafa;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin: 0;
+}
+
 .empty-state {
   color: #777;
   padding: 40px 0;
