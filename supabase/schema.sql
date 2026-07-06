@@ -31,7 +31,7 @@ create index if not exists idx_tenders_status on tenders (status);
 -- Business profiles used to define what counts as "relevant"
 create table if not exists matching_profiles (
   id uuid primary key default gen_random_uuid(),
-  name text not null,
+  name text not null unique,
   keywords text[],
   categories text[],
   provinces text[],
@@ -76,12 +76,23 @@ alter table matching_profiles enable row level security;
 alter table tender_matches enable row level security;
 alter table ingestion_runs enable row level security;
 
--- Seed one starter matching profile — edit keywords to taste after reviewing real data
-insert into matching_profiles (name, keywords, categories, provinces)
+-- Starter matching profile, tuned against real eTenders OCDS categories
+-- (Computer programming/Information and communication/Supplies: Computer
+-- Equipment etc. are actual `category` values seen in ingested tenders).
+insert into matching_profiles (name, keywords, categories, provinces, min_value, max_value, cidb_grade)
 values (
   'Tonti Trading - IT Hardware',
-  array['ICT', 'IT infrastructure', 'hardware', 'computer equipment', 'networking', 'servers', 'software licence', 'printers', 'UPS'],
-  array[]::text[],
-  array['Gauteng']
+  array['ICT', 'IT infrastructure', 'hardware', 'computer equipment', 'networking', 'servers', 'software licence', 'printers', 'UPS', 'laptops', 'desktops', 'data centre', 'cabling'],
+  array['Computer programming, consultancy and related activities', 'Information and communication', 'Information service activities', 'Supplies: Computer Equipment', 'Supplies: Electrical Equipment'],
+  array[]::text[], -- national — no province restriction
+  null,
+  1000000,
+  null
 )
-on conflict do nothing;
+on conflict (name) do update set
+  keywords = excluded.keywords,
+  categories = excluded.categories,
+  provinces = excluded.provinces,
+  min_value = excluded.min_value,
+  max_value = excluded.max_value,
+  cidb_grade = excluded.cidb_grade;
