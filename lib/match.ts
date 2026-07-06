@@ -116,3 +116,28 @@ export async function matchTenders(tenderIds: string[]): Promise<number> {
 
   return matchesToInsert.length;
 }
+
+/**
+ * Re-scores every tender in the table against all active profiles. Call
+ * this after creating/editing/deleting a profile so match results reflect
+ * the new criteria immediately, instead of waiting for the next ingestion.
+ */
+export async function rematchAllTenders(): Promise<number> {
+  const supabase = getSupabaseServerClient();
+
+  const tenderIds: string[] = [];
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from("tenders")
+      .select("id")
+      .range(from, from + pageSize - 1);
+
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    tenderIds.push(...data.map((row) => row.id));
+    if (data.length < pageSize) break;
+  }
+
+  return matchTenders(tenderIds);
+}

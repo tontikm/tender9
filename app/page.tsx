@@ -118,6 +118,9 @@ export default async function HomePage({
 
   return (
     <main>
+      <nav className="page-nav">
+        <a href="/profiles">Manage matching profiles &rarr;</a>
+      </nav>
       <h1>Tender9</h1>
       <p className="subtitle">Matched tenders from the eTenders OCDS feed.</p>
 
