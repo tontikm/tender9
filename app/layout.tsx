@@ -1,3 +1,5 @@
+import "./globals.css";
+
 export const metadata = {
   title: "Tender9",
   description: "SA government tender monitoring and response generation",
