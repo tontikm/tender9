@@ -1,0 +1,185 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #f5f6f8;
+  color: #1a1a1a;
+}
+
+main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+}
+
+h1 {
+  margin: 0 0 4px;
+  font-size: 24px;
+}
+
+.subtitle {
+  color: #666;
+  margin: 0 0 24px;
+  font-size: 14px;
+}
+
+.run-banner {
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 24px;
+  font-size: 14px;
+  border: 1px solid transparent;
+}
+
+.run-banner.success {
+  background: #eafaf0;
+  border-color: #b8ecc9;
+  color: #1a6b3c;
+}
+
+.run-banner.failed {
+  background: #fdecec;
+  border-color: #f5b6b6;
+  color: #a11d1d;
+}
+
+.run-banner.running {
+  background: #eef4ff;
+  border-color: #bcd4f7;
+  color: #1a4a8a;
+}
+
+.run-banner.none {
+  background: #f0f0f0;
+  border-color: #ddd;
+  color: #555;
+}
+
+.filters {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.filters a {
+  padding: 6px 14px;
+  border-radius: 999px;
+  text-decoration: none;
+  font-size: 13px;
+  color: #444;
+  background: #fff;
+  border: 1px solid #ddd;
+}
+
+.filters a.active {
+  background: #1a1a1a;
+  color: #fff;
+  border-color: #1a1a1a;
+}
+
+.match-card {
+  background: #fff;
+  border: 1px solid #e3e3e3;
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin-bottom: 12px;
+}
+
+.match-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.match-title {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+
+.match-title a {
+  color: #1a1a1a;
+  text-decoration: none;
+}
+
+.match-title a:hover {
+  text-decoration: underline;
+}
+
+.match-meta {
+  color: #555;
+  font-size: 13px;
+  margin: 0 0 8px;
+}
+
+.match-meta span + span::before {
+  content: " · ";
+  color: #bbb;
+}
+
+.badges {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.badge {
+  font-size: 12px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.badge.score {
+  background: #eef4ff;
+  color: #1a4a8a;
+}
+
+.badge.status-new {
+  background: #eef4ff;
+  color: #1a4a8a;
+}
+
+.badge.status-saved {
+  background: #fff6e0;
+  color: #8a6512;
+}
+
+.badge.status-applied {
+  background: #eafaf0;
+  color: #1a6b3c;
+}
+
+.badge.status-dismissed {
+  background: #f0f0f0;
+  color: #777;
+}
+
+.match-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.match-actions button {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  background: #fafafa;
+  cursor: pointer;
+}
+
+.match-actions button:hover {
+  background: #f0f0f0;
+}
+
+.empty-state {
+  color: #777;
+  padding: 40px 0;
+  text-align: center;
+}
