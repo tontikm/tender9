@@ -1,6 +1,7 @@
 import { getSupabaseServerClient } from "@/lib/supabase";
 import { updateMatchStatus, generateDraft } from "./actions";
 import { IconBuilding, IconTag, IconMapPin, IconCalendar, IconCoin } from "./components/icons";
+import { formatDate, formatValue } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -43,24 +44,6 @@ interface IngestionRun {
   records_new: number | null;
   records_updated: number | null;
   error_message: string | null;
-}
-
-function formatDate(value: string | null): string {
-  if (!value) return "—";
-  return new Date(value).toLocaleDateString("en-ZA", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-function formatValue(amount: number | null, currency: string | null): string {
-  if (amount == null || amount === 0) return "—";
-  return new Intl.NumberFormat("en-ZA", {
-    style: "currency",
-    currency: currency ?? "ZAR",
-    maximumFractionDigits: 0,
-  }).format(amount);
 }
 
 function StatsBar({ counts }: { counts: Record<string, number> }) {
@@ -238,13 +221,7 @@ export default async function HomePage({
             <div className="match-card-header">
               <div>
                 <h3 className="match-title">
-                  {tender.document_urls?.[0] ? (
-                    <a href={tender.document_urls[0]} target="_blank" rel="noreferrer">
-                      {tender.title}
-                    </a>
-                  ) : (
-                    tender.title
-                  )}
+                  <a href={`/tenders/${tender.id}`}>{tender.title}</a>
                 </h3>
                 <div className="match-meta">
                   <span className="meta-item">
