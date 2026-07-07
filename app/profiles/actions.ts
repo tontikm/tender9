@@ -52,7 +52,7 @@ export async function saveProfile(formData: FormData) {
   await rematchAllTenders();
 
   revalidatePath("/profiles");
-  revalidatePath("/");
+  revalidatePath("/dashboard");
 }
 
 export async function deleteProfile(id: string) {
@@ -64,5 +64,5 @@ export async function deleteProfile(id: string) {
   if (error) throw error;
 
   revalidatePath("/profiles");
-  revalidatePath("/");
+  revalidatePath("/dashboard");
 }

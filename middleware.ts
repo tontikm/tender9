@@ -1,7 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/signup"];
+// "/" is the public marketing homepage — viewable when signed out, but
+// signed-in users get bounced straight to /dashboard instead of seeing it.
+const AUTH_ONLY_PATHS = ["/login", "/signup"];
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -27,17 +29,19 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isPublicPath = PUBLIC_PATHS.some((p) => request.nextUrl.pathname.startsWith(p));
+  const pathname = request.nextUrl.pathname;
+  const isAuthOnlyPath = AUTH_ONLY_PATHS.some((p) => pathname.startsWith(p));
+  const isHomepage = pathname === "/";
 
-  if (!user && !isPublicPath) {
+  if (!user && !isAuthOnlyPath && !isHomepage) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
-  if (user && isPublicPath) {
+  if (user && (isAuthOnlyPath || isHomepage)) {
     const url = request.nextUrl.clone();
-    url.pathname = "/";
+    url.pathname = "/dashboard";
     return NextResponse.redirect(url);
   }
 
