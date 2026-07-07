@@ -439,6 +439,40 @@ button:hover,
   color: var(--color-text);
 }
 
+/* ---------- Pagination ---------- */
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  margin-top: 24px;
+  padding-top: 20px;
+}
+
+.pagination a {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-primary);
+  text-decoration: none;
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+}
+
+.pagination a:hover {
+  background: var(--color-primary-bg);
+}
+
+.pagination a.disabled {
+  color: var(--color-text-faint);
+  pointer-events: none;
+}
+
+.pagination-status {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
 /* ---------- Empty / error states ---------- */
 
 .empty-state {

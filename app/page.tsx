@@ -7,6 +7,8 @@ export const dynamic = "force-dynamic";
 const STATUS_FILTERS = ["all", "new", "saved", "applied", "dismissed"] as const;
 type StatusFilter = (typeof STATUS_FILTERS)[number];
 
+const PAGE_SIZE = 20;
+
 interface TenderRow {
   id: string;
   title: string;
@@ -80,6 +82,48 @@ function StatsBar({ counts }: { counts: Record<string, number> }) {
   );
 }
 
+function Pagination({
+  page,
+  totalPages,
+  statusFilter,
+}: {
+  page: number;
+  totalPages: number;
+  statusFilter: StatusFilter;
+}) {
+  if (totalPages <= 1) return null;
+
+  const hrefFor = (p: number) => {
+    const qs = new URLSearchParams();
+    if (statusFilter !== "all") qs.set("status", statusFilter);
+    if (p > 1) qs.set("page", String(p));
+    const query = qs.toString();
+    return query ? `/?${query}` : "/";
+  };
+
+  return (
+    <nav className="pagination">
+      <a
+        href={hrefFor(page - 1)}
+        aria-disabled={page <= 1}
+        className={page <= 1 ? "disabled" : ""}
+      >
+        &larr; Previous
+      </a>
+      <span className="pagination-status">
+        Page {page} of {totalPages}
+      </span>
+      <a
+        href={hrefFor(page + 1)}
+        aria-disabled={page >= totalPages}
+        className={page >= totalPages ? "disabled" : ""}
+      >
+        Next &rarr;
+      </a>
+    </nav>
+  );
+}
+
 function RunBanner({ run }: { run: IngestionRun | null }) {
   if (!run) {
     return <div className="run-banner none">No ingestion runs yet.</div>;
@@ -113,12 +157,13 @@ function RunBanner({ run }: { run: IngestionRun | null }) {
 export default async function HomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; page?: string }>;
 }) {
   const params = await searchParams;
   const statusFilter: StatusFilter = STATUS_FILTERS.includes(params.status as StatusFilter)
     ? (params.status as StatusFilter)
     : "all";
+  const page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
 
   const supabase = getSupabaseServerClient();
 
@@ -131,8 +176,9 @@ export default async function HomePage({
 
   let query = supabase
     .from("tender_matches")
-    .select("id, match_score, status, tenders(*), matching_profiles(name)")
-    .order("match_score", { ascending: false });
+    .select("id, match_score, status, tenders(*), matching_profiles(name)", { count: "exact" })
+    .order("match_score", { ascending: false })
+    .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
 
   if (statusFilter === "all") {
     query = query.neq("status", "dismissed");
@@ -140,7 +186,8 @@ export default async function HomePage({
     query = query.eq("status", statusFilter);
   }
 
-  const { data: matches, error } = await query.returns<MatchRow[]>();
+  const { data: matches, error, count } = await query.returns<MatchRow[]>();
+  const totalPages = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE));
 
   const { data: drafts } = await supabase
     .from("tender_drafts")
@@ -263,6 +310,8 @@ export default async function HomePage({
           </article>
         );
       })}
+
+      <Pagination page={page} totalPages={totalPages} statusFilter={statusFilter} />
     </main>
   );
 }
