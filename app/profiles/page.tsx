@@ -106,9 +106,6 @@ export default async function ProfilesPage() {
 
   return (
     <main>
-      <nav className="page-nav">
-        <a href="/">&larr; Back to matched tenders</a>
-      </nav>
       <h1>Matching profiles</h1>
       <p className="subtitle">
         Tenders are scored against every active profile below. Editing or adding a profile
