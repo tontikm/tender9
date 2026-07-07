@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getSupabaseServerClient } from "@/lib/supabase";
+import { getCurrentUser } from "@/lib/supabase-auth";
 import { rematchAllTenders } from "@/lib/match";
 
 // One entry per line — comma-splitting breaks on values that contain commas
@@ -22,11 +23,15 @@ function parseNumber(value: FormDataEntryValue | null): number | null {
 }
 
 export async function saveProfile(formData: FormData) {
+  const user = await getCurrentUser();
+  if (!user) throw new Error("Not signed in");
+
   const id = formData.get("id")?.toString() || null;
   const name = formData.get("name")?.toString().trim();
   if (!name) throw new Error("Profile name is required");
 
   const record = {
+    user_id: user.id,
     name,
     keywords: parseList(formData.get("keywords")),
     categories: parseList(formData.get("categories")),
@@ -39,7 +44,7 @@ export async function saveProfile(formData: FormData) {
 
   const supabase = getSupabaseServerClient();
   const { error } = id
-    ? await supabase.from("matching_profiles").update(record).eq("id", id)
+    ? await supabase.from("matching_profiles").update(record).eq("id", id).eq("user_id", user.id)
     : await supabase.from("matching_profiles").insert(record);
 
   if (error) throw error;
@@ -51,8 +56,11 @@ export async function saveProfile(formData: FormData) {
 }
 
 export async function deleteProfile(id: string) {
+  const user = await getCurrentUser();
+  if (!user) throw new Error("Not signed in");
+
   const supabase = getSupabaseServerClient();
-  const { error } = await supabase.from("matching_profiles").delete().eq("id", id);
+  const { error } = await supabase.from("matching_profiles").delete().eq("id", id).eq("user_id", user.id);
   if (error) throw error;
 
   revalidatePath("/profiles");

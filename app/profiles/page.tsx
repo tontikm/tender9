@@ -1,4 +1,5 @@
 import { getSupabaseServerClient } from "@/lib/supabase";
+import { getCurrentUser } from "@/lib/supabase-auth";
 import { saveProfile, deleteProfile } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -97,10 +98,12 @@ function ProfileForm({ profile }: { profile: Profile | null }) {
 }
 
 export default async function ProfilesPage() {
+  const user = await getCurrentUser();
   const supabase = getSupabaseServerClient();
   const { data: profiles, error } = await supabase
     .from("matching_profiles")
     .select("*")
+    .eq("user_id", user?.id ?? "")
     .order("created_at", { ascending: true })
     .returns<Profile[]>();
 
