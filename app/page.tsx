@@ -1,5 +1,6 @@
 import { getSupabaseServerClient } from "@/lib/supabase";
 import { updateMatchStatus, generateDraft } from "./actions";
+import { IconBuilding, IconTag, IconMapPin, IconCalendar, IconCoin } from "./components/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -58,6 +59,25 @@ function formatValue(amount: number | null, currency: string | null): string {
     currency: currency ?? "ZAR",
     maximumFractionDigits: 0,
   }).format(amount);
+}
+
+function StatsBar({ counts }: { counts: Record<string, number> }) {
+  const stats = [
+    { label: "New", value: counts.new ?? 0 },
+    { label: "Saved", value: counts.saved ?? 0 },
+    { label: "Applied", value: counts.applied ?? 0 },
+  ];
+
+  return (
+    <div className="stats-bar">
+      {stats.map((stat) => (
+        <div className="stat-card" key={stat.label}>
+          <span className="stat-value">{stat.value}</span>
+          <span className="stat-label">{stat.label}</span>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function RunBanner({ run }: { run: IngestionRun | null }) {
@@ -128,10 +148,18 @@ export default async function HomePage({
     .returns<DraftRow[]>();
   const draftsByTenderId = new Map((drafts ?? []).map((d) => [d.tender_id, d]));
 
+  const { data: allStatuses } = await supabase.from("tender_matches").select("status");
+  const statusCounts = (allStatuses ?? []).reduce<Record<string, number>>((acc, row) => {
+    acc[row.status] = (acc[row.status] ?? 0) + 1;
+    return acc;
+  }, {});
+
   return (
     <main>
       <h1>Matched tenders</h1>
       <p className="subtitle">Tenders from the eTenders OCDS feed, scored against your matching profiles.</p>
+
+      <StatsBar counts={statusCounts} />
 
       <RunBanner run={lastRun as IngestionRun | null} />
 
@@ -171,13 +199,28 @@ export default async function HomePage({
                     tender.title
                   )}
                 </h3>
-                <p className="match-meta">
-                  <span>{tender.buyer_name ?? "Unknown buyer"}</span>
-                  <span>{tender.category ?? "Uncategorized"}</span>
-                  <span>{tender.province ?? "No province"}</span>
-                  <span>{formatValue(tender.value_estimate, tender.currency)}</span>
-                  <span>Closes {formatDate(tender.closing_date)}</span>
-                </p>
+                <div className="match-meta">
+                  <span className="meta-item">
+                    <IconBuilding className="meta-icon" />
+                    {tender.buyer_name ?? "Unknown buyer"}
+                  </span>
+                  <span className="meta-item">
+                    <IconTag className="meta-icon" />
+                    {tender.category ?? "Uncategorized"}
+                  </span>
+                  <span className="meta-item">
+                    <IconMapPin className="meta-icon" />
+                    {tender.province ?? "National"}
+                  </span>
+                  <span className="meta-item">
+                    <IconCoin className="meta-icon" />
+                    {formatValue(tender.value_estimate, tender.currency)}
+                  </span>
+                  <span className="meta-item">
+                    <IconCalendar className="meta-icon" />
+                    Closes {formatDate(tender.closing_date)}
+                  </span>
+                </div>
               </div>
               <div className="badges">
                 <span className="badge score">Score {match.match_score ?? 0}</span>
