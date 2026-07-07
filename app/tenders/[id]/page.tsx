@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getSupabaseServerClient } from "@/lib/supabase";
-import { updateMatchStatus, generateDraft } from "../../actions";
+import { updateMatchStatus } from "../../actions";
 import { IconBuilding, IconTag, IconMapPin, IconCalendar, IconCoin } from "../../components/icons";
 import { formatDate, formatDateTime, formatValue } from "@/lib/format";
 
@@ -29,11 +29,6 @@ interface MatchRow {
   matching_profiles: { name: string } | null;
 }
 
-interface DraftRow {
-  content: string;
-  created_at: string;
-}
-
 export default async function TenderDetailPage({
   params,
 }: {
@@ -58,12 +53,6 @@ export default async function TenderDetailPage({
     .eq("tender_id", id)
     .order("match_score", { ascending: false })
     .returns<MatchRow[]>();
-
-  const { data: draft } = await supabase
-    .from("tender_drafts")
-    .select("content, created_at")
-    .eq("tender_id", id)
-    .maybeSingle<DraftRow>();
 
   return (
     <main>
@@ -165,24 +154,11 @@ export default async function TenderDetailPage({
                   <form action={updateMatchStatus.bind(null, match.id, "dismissed")} className="dismiss-button">
                     <button type="submit">Dismiss</button>
                   </form>
-                  {match.status === "saved" && (
-                    <form action={generateDraft.bind(null, tender.id)} className="draft-button">
-                      <button type="submit">{draft ? "Regenerate draft" : "Draft response"}</button>
-                    </form>
-                  )}
                 </div>
               )}
             </article>
           ))}
         </>
-      )}
-
-      {draft && (
-        <div className="draft-block">
-          <p className="draft-label">Draft response</p>
-          <p className="draft-meta">Drafted {formatDateTime(draft.created_at)}</p>
-          <pre className="draft-content">{draft.content}</pre>
-        </div>
       )}
     </main>
   );

@@ -1,5 +1,5 @@
 import { getSupabaseServerClient } from "@/lib/supabase";
-import { updateMatchStatus, generateDraft } from "./actions";
+import { updateMatchStatus } from "./actions";
 import { IconBuilding, IconTag, IconMapPin, IconCalendar, IconCoin } from "./components/icons";
 import { formatDate, formatValue } from "@/lib/format";
 
@@ -20,12 +20,6 @@ interface TenderRow {
   currency: string | null;
   closing_date: string | null;
   document_urls: string[] | null;
-}
-
-interface DraftRow {
-  tender_id: string;
-  content: string;
-  created_at: string;
 }
 
 interface MatchRow {
@@ -172,12 +166,6 @@ export default async function HomePage({
   const { data: matches, error, count } = await query.returns<MatchRow[]>();
   const totalPages = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE));
 
-  const { data: drafts } = await supabase
-    .from("tender_drafts")
-    .select("tender_id, content, created_at")
-    .returns<DraftRow[]>();
-  const draftsByTenderId = new Map((drafts ?? []).map((d) => [d.tender_id, d]));
-
   const { data: allStatuses } = await supabase.from("tender_matches").select("status");
   const statusCounts = (allStatuses ?? []).reduce<Record<string, number>>((acc, row) => {
     acc[row.status] = (acc[row.status] ?? 0) + 1;
@@ -214,7 +202,6 @@ export default async function HomePage({
       {matches?.map((match) => {
         const tender = match.tenders;
         if (!tender) return null;
-        const draft = draftsByTenderId.get(tender.id);
 
         return (
           <article className="match-card" key={match.id}>
@@ -267,21 +254,6 @@ export default async function HomePage({
                 <form action={updateMatchStatus.bind(null, match.id, "dismissed")} className="dismiss-button">
                   <button type="submit">Dismiss</button>
                 </form>
-                {match.status === "saved" && (
-                  <form action={generateDraft.bind(null, tender.id)} className="draft-button">
-                    <button type="submit">{draft ? "Regenerate draft" : "Draft response"}</button>
-                  </form>
-                )}
-              </div>
-            )}
-
-            {match.status === "saved" && draft && (
-              <div className="draft-block">
-                <p className="draft-label">Draft response</p>
-                <p className="draft-meta">
-                  Drafted {new Date(draft.created_at).toLocaleString("en-ZA")}
-                </p>
-                <pre className="draft-content">{draft.content}</pre>
               </div>
             )}
           </article>
