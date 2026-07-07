@@ -130,11 +130,8 @@ export default async function HomePage({
 
   return (
     <main>
-      <nav className="page-nav">
-        <a href="/profiles">Manage matching profiles &rarr;</a>
-      </nav>
-      <h1>Tender9</h1>
-      <p className="subtitle">Matched tenders from the eTenders OCDS feed.</p>
+      <h1>Matched tenders</h1>
+      <p className="subtitle">Tenders from the eTenders OCDS feed, scored against your matching profiles.</p>
 
       <RunBanner run={lastRun as IngestionRun | null} />
 
@@ -200,11 +197,11 @@ export default async function HomePage({
                     <button type="submit">Mark applied</button>
                   </form>
                 )}
-                <form action={updateMatchStatus.bind(null, match.id, "dismissed")}>
+                <form action={updateMatchStatus.bind(null, match.id, "dismissed")} className="dismiss-button">
                   <button type="submit">Dismiss</button>
                 </form>
                 {match.status === "saved" && (
-                  <form action={generateDraft.bind(null, tender.id)}>
+                  <form action={generateDraft.bind(null, tender.id)} className="draft-button">
                     <button type="submit">{draft ? "Regenerate draft" : "Draft response"}</button>
                   </form>
                 )}
@@ -213,6 +210,7 @@ export default async function HomePage({
 
             {match.status === "saved" && draft && (
               <div className="draft-block">
+                <p className="draft-label">Draft response</p>
                 <p className="draft-meta">
                   Drafted {new Date(draft.created_at).toLocaleString("en-ZA")}
                 </p>
