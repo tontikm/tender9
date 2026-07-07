@@ -1,4 +1,5 @@
 import { getSupabaseServerClient } from "@/lib/supabase";
+import { getCurrentUser } from "@/lib/supabase-auth";
 import { updateMatchStatus } from "./actions";
 import { IconBuilding, IconTag, IconMapPin, IconCalendar, IconCoin } from "./components/icons";
 import { formatDate, formatValue } from "@/lib/format";
@@ -142,6 +143,8 @@ export default async function HomePage({
     : "all";
   const page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
 
+  const user = await getCurrentUser();
+  const userId = user?.id ?? "";
   const supabase = getSupabaseServerClient();
 
   const { data: lastRun } = await supabase
@@ -153,7 +156,8 @@ export default async function HomePage({
 
   let query = supabase
     .from("tender_matches")
-    .select("id, match_score, status, tenders(*), matching_profiles(name)", { count: "exact" })
+    .select("id, match_score, status, tenders(*), matching_profiles!inner(name, user_id)", { count: "exact" })
+    .eq("matching_profiles.user_id", userId)
     .order("match_score", { ascending: false })
     .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
 
@@ -166,7 +170,10 @@ export default async function HomePage({
   const { data: matches, error, count } = await query.returns<MatchRow[]>();
   const totalPages = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE));
 
-  const { data: allStatuses } = await supabase.from("tender_matches").select("status");
+  const { data: allStatuses } = await supabase
+    .from("tender_matches")
+    .select("status, matching_profiles!inner(user_id)")
+    .eq("matching_profiles.user_id", userId);
   const statusCounts = (allStatuses ?? []).reduce<Record<string, number>>((acc, row) => {
     acc[row.status] = (acc[row.status] ?? 0) + 1;
     return acc;

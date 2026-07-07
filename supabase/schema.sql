@@ -28,10 +28,14 @@ create index if not exists idx_tenders_closing_date on tenders (closing_date);
 create index if not exists idx_tenders_category on tenders (category);
 create index if not exists idx_tenders_status on tenders (status);
 
--- Business profiles used to define what counts as "relevant"
+-- Business profiles used to define what counts as "relevant".
+-- Each belongs to one signed-up account (user_id) — this is the
+-- multi-tenancy boundary: every query scopes matching_profiles (and,
+-- through it, tender_matches) to the authenticated user.
 create table if not exists matching_profiles (
   id uuid primary key default gen_random_uuid(),
-  name text not null unique,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  name text not null,
   keywords text[],
   categories text[],
   provinces text[],
@@ -39,8 +43,11 @@ create table if not exists matching_profiles (
   max_value numeric,
   cidb_grade text,
   active boolean default true,
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  unique (user_id, name)
 );
+
+create index if not exists idx_matching_profiles_user_id on matching_profiles (user_id);
 
 -- Matches: which tenders matched which profile
 create table if not exists tender_matches (
@@ -77,33 +84,13 @@ create table if not exists ingestion_runs (
   error_message text
 );
 
--- Enable RLS on everything. This is internal tooling (only you use it),
--- so no public read/write policies are created here on purpose —
--- all access goes through API routes using the service role key,
--- which bypasses RLS by design. Do not add public policies to these tables.
+-- Enable RLS on everything. All access goes through server-side code
+-- using the service role key (which bypasses RLS by design), so no
+-- public policies are created here — per-user scoping (matching_profiles
+-- .user_id) is enforced in the application layer, not by RLS. Do not add
+-- public policies to these tables.
 alter table tenders enable row level security;
 alter table matching_profiles enable row level security;
 alter table tender_matches enable row level security;
 alter table tender_drafts enable row level security;
 alter table ingestion_runs enable row level security;
-
--- Starter matching profile, tuned against real eTenders OCDS categories
--- (Computer programming/Information and communication/Supplies: Computer
--- Equipment etc. are actual `category` values seen in ingested tenders).
-insert into matching_profiles (name, keywords, categories, provinces, min_value, max_value, cidb_grade)
-values (
-  'Tonti Trading - IT Hardware',
-  array['ICT', 'IT infrastructure', 'hardware', 'computer equipment', 'networking', 'servers', 'software licence', 'printers', 'UPS', 'laptops', 'desktops', 'data centre', 'cabling'],
-  array['Computer programming, consultancy and related activities', 'Information and communication', 'Information service activities', 'Supplies: Computer Equipment', 'Supplies: Electrical Equipment'],
-  array[]::text[], -- national — no province restriction
-  null,
-  1000000,
-  null
-)
-on conflict (name) do update set
-  keywords = excluded.keywords,
-  categories = excluded.categories,
-  provinces = excluded.provinces,
-  min_value = excluded.min_value,
-  max_value = excluded.max_value,
-  cidb_grade = excluded.cidb_grade;

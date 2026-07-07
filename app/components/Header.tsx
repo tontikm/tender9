@@ -1,4 +1,9 @@
-export function Header() {
+import { getCurrentUser } from "@/lib/supabase-auth";
+import { signOut } from "../login/actions";
+
+export async function Header() {
+  const user = await getCurrentUser();
+
   return (
     <header className="site-header">
       <div className="site-header-inner">
@@ -6,10 +11,17 @@ export function Header() {
           <span className="brand-mark">T9</span>
           <span className="brand-name">Tender9</span>
         </a>
-        <nav className="site-nav">
-          <a href="/">Tenders</a>
-          <a href="/profiles">Profiles</a>
-        </nav>
+        {user && (
+          <nav className="site-nav">
+            <a href="/">Tenders</a>
+            <a href="/profiles">Profiles</a>
+            <form action={signOut}>
+              <button type="submit" className="signout-button">
+                Sign out
+              </button>
+            </form>
+          </nav>
+        )}
       </div>
     </header>
   );

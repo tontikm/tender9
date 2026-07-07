@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { getSupabaseServerClient } from "@/lib/supabase";
+import { getCurrentUser } from "@/lib/supabase-auth";
 import { updateMatchStatus } from "../../actions";
 import { IconBuilding, IconTag, IconMapPin, IconCalendar, IconCoin } from "../../components/icons";
 import { formatDate, formatDateTime, formatValue } from "@/lib/format";
@@ -35,6 +36,7 @@ export default async function TenderDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const user = await getCurrentUser();
   const supabase = getSupabaseServerClient();
 
   const { data: tender } = await supabase
@@ -49,8 +51,9 @@ export default async function TenderDetailPage({
 
   const { data: matches } = await supabase
     .from("tender_matches")
-    .select("id, match_score, status, matching_profiles(name)")
+    .select("id, match_score, status, matching_profiles!inner(name, user_id)")
     .eq("tender_id", id)
+    .eq("matching_profiles.user_id", user?.id ?? "")
     .order("match_score", { ascending: false })
     .returns<MatchRow[]>();
 
