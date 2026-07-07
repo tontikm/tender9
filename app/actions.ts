@@ -35,10 +35,10 @@ export async function updateMatchStatus(matchId: string, status: string) {
 
   if (error) throw error;
 
-  revalidatePath("/");
+  revalidatePath("/dashboard");
 }
 
 export async function generateDraft(tenderId: string) {
   await generateDraftForTender(tenderId);
-  revalidatePath("/");
+  revalidatePath("/dashboard");
 }

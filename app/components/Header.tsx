@@ -7,13 +7,13 @@ export async function Header() {
   return (
     <header className="site-header">
       <div className="site-header-inner">
-        <a href="/" className="brand">
+        <a href={user ? "/dashboard" : "/"} className="brand">
           <span className="brand-mark">T9</span>
           <span className="brand-name">Tender9</span>
         </a>
         {user && (
           <nav className="site-nav">
-            <a href="/">Tenders</a>
+            <a href="/dashboard">Tenders</a>
             <a href="/profiles">Profiles</a>
             <form action={signOut}>
               <button type="submit" className="signout-button">

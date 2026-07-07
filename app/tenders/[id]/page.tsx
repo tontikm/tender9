@@ -60,7 +60,7 @@ export default async function TenderDetailPage({
   return (
     <main>
       <nav className="page-nav">
-        <a href="/">&larr; Back to matched tenders</a>
+        <a href="/dashboard">&larr; Back to matched tenders</a>
       </nav>
 
       <h1>{tender.title}</h1>
