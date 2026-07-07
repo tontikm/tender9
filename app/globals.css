@@ -1,16 +1,16 @@
 :root {
-  --color-bg: #f6f7f9;
+  --color-bg: #f3f6f6;
   --color-surface: #ffffff;
-  --color-border: #e6e8eb;
-  --color-border-strong: #d4d8dd;
-  --color-text: #14171f;
-  --color-text-muted: #667085;
-  --color-text-faint: #98a2b3;
+  --color-border: #e1e7e7;
+  --color-border-strong: #c7d1d1;
+  --color-text: #1b2426;
+  --color-text-muted: #5c6f72;
+  --color-text-faint: #93a5a7;
 
-  --color-primary: #2b4fd6;
-  --color-primary-hover: #2140b3;
+  --color-primary: #0f766e;
+  --color-primary-hover: #0b5c56;
   --color-primary-contrast: #ffffff;
-  --color-primary-bg: #eef2ff;
+  --color-primary-bg: #e3f2f0;
 
   --color-danger: #b3261e;
   --color-danger-bg: #fdecec;
@@ -24,12 +24,12 @@
   --color-warning-bg: #fdf3dd;
   --color-warning-border: #f2d792;
 
-  --color-info: #1c4d99;
-  --color-info-bg: #eaf1ff;
-  --color-info-border: #bcd4f7;
+  --color-info: #395c78;
+  --color-info-bg: #e9f0f5;
+  --color-info-border: #c3d6e2;
 
-  --color-neutral-bg: #f0f1f3;
-  --color-neutral-border: #dcdfe4;
+  --color-neutral-bg: #eef1f1;
+  --color-neutral-border: #dbe2e2;
 
   --radius-sm: 6px;
   --radius-md: 10px;
@@ -359,7 +359,7 @@ button:hover,
   margin-top: 16px;
   padding: 16px;
   background: var(--color-primary-bg);
-  border: 1px solid #d7deff;
+  border: 1px solid #bfe0dc;
   border-radius: var(--radius-md);
 }
 
