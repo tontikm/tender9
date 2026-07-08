@@ -49,6 +49,36 @@ create table if not exists matching_profiles (
 
 create index if not exists idx_matching_profiles_user_id on matching_profiles (user_id);
 
+-- Company profile: the signed-up account's own business details, used to
+-- pre-fill bid paperwork (SBD forms etc.). One row per user. Distinct from
+-- matching_profiles, which describe what tenders the user wants — this
+-- describes who the user is.
+create table if not exists company_profiles (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade unique,
+  legal_name text,
+  trading_name text,
+  registration_number text,      -- CIPC registration number
+  vat_number text,
+  csd_number text,               -- Central Supplier Database (MAAA) number
+  tax_compliance_pin text,       -- SARS Tax Compliance Status PIN
+  bbbee_level text,              -- '1'..'8' | 'Non-compliant' | 'Exempt Micro Enterprise'
+  bbbee_expiry date,
+  cidb_grade text,
+  cidb_expiry date,
+  physical_address text,
+  contact_email text,
+  contact_phone text,
+  bank_name text,
+  bank_account_holder text,
+  bank_account_number text,
+  bank_branch_code text,
+  signatory_name text,           -- person authorised to sign bids
+  signatory_capacity text,       -- their role, e.g. "Director"
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
 -- Matches: which tenders matched which profile
 create table if not exists tender_matches (
   id uuid primary key default gen_random_uuid(),
@@ -92,6 +122,7 @@ create table if not exists ingestion_runs (
 -- legitimately need to read/write across every account at once.
 alter table tenders enable row level security;
 alter table matching_profiles enable row level security;
+alter table company_profiles enable row level security;
 alter table tender_matches enable row level security;
 alter table tender_drafts enable row level security;
 alter table ingestion_runs enable row level security;
@@ -115,6 +146,14 @@ create policy "Authenticated users can read ingestion runs"
 drop policy if exists "Users manage their own matching profiles" on matching_profiles;
 create policy "Users manage their own matching profiles"
   on matching_profiles for all
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- company_profiles: an account only ever sees/manages its own company.
+drop policy if exists "Users manage their own company profile" on company_profiles;
+create policy "Users manage their own company profile"
+  on company_profiles for all
   to authenticated
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);

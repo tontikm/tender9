@@ -15,6 +15,7 @@ export async function Header() {
           <nav className="site-nav">
             <a href="/dashboard">Tenders</a>
             <a href="/profiles">Profiles</a>
+            <a href="/company">Company</a>
             <form action={signOut}>
               <button type="submit" className="signout-button">
                 Sign out
