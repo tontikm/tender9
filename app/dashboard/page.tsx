@@ -8,6 +8,13 @@ export const dynamic = "force-dynamic";
 const STATUS_FILTERS = ["all", "new", "saved", "applied", "dismissed"] as const;
 type StatusFilter = (typeof STATUS_FILTERS)[number];
 
+const SORT_OPTIONS = ["score", "closing"] as const;
+type SortOption = (typeof SORT_OPTIONS)[number];
+const SORT_LABELS: Record<SortOption, string> = {
+  score: "Best match",
+  closing: "Closing soonest",
+};
+
 const PAGE_SIZE = 20;
 
 interface TenderRow {
@@ -63,16 +70,19 @@ function Pagination({
   page,
   totalPages,
   statusFilter,
+  sortOption,
 }: {
   page: number;
   totalPages: number;
   statusFilter: StatusFilter;
+  sortOption: SortOption;
 }) {
   if (totalPages <= 1) return null;
 
   const hrefFor = (p: number) => {
     const qs = new URLSearchParams();
     if (statusFilter !== "all") qs.set("status", statusFilter);
+    if (sortOption !== "score") qs.set("sort", sortOption);
     if (p > 1) qs.set("page", String(p));
     const query = qs.toString();
     return query ? `/dashboard?${query}` : "/dashboard";
@@ -134,13 +144,26 @@ function RunBanner({ run }: { run: IngestionRun | null }) {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; page?: string }>;
+  searchParams: Promise<{ status?: string; page?: string; sort?: string }>;
 }) {
   const params = await searchParams;
   const statusFilter: StatusFilter = STATUS_FILTERS.includes(params.status as StatusFilter)
     ? (params.status as StatusFilter)
     : "all";
+  const sortOption: SortOption = SORT_OPTIONS.includes(params.sort as SortOption)
+    ? (params.sort as SortOption)
+    : "score";
   const page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
+
+  const hrefFor = (overrides: { status?: StatusFilter; sort?: SortOption }) => {
+    const nextStatus = overrides.status ?? statusFilter;
+    const nextSort = overrides.sort ?? sortOption;
+    const qs = new URLSearchParams();
+    if (nextStatus !== "all") qs.set("status", nextStatus);
+    if (nextSort !== "score") qs.set("sort", nextSort);
+    const query = qs.toString();
+    return query ? `/dashboard?${query}` : "/dashboard";
+  };
 
   const user = await getCurrentUser();
   const userId = user?.id ?? "";
@@ -180,6 +203,21 @@ export default async function DashboardPage({
   const visibleMatches = (allMatches ?? []).filter(
     (match) => !isExpiredAndUnreviewed(match.status, match.tenders?.closing_date)
   );
+
+  if (sortOption === "closing") {
+    // Base query is already ordered by match_score; re-sort in application
+    // code rather than pushing this through PostgREST, consistent with the
+    // closing-date filtering above.
+    visibleMatches.sort((a, b) => {
+      const aDate = a.tenders?.closing_date;
+      const bDate = b.tenders?.closing_date;
+      if (!aDate && !bDate) return 0;
+      if (!aDate) return 1;
+      if (!bDate) return -1;
+      return aDate.localeCompare(bDate);
+    });
+  }
+
   const totalPages = Math.max(1, Math.ceil(visibleMatches.length / PAGE_SIZE));
   const matches = visibleMatches.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
@@ -204,17 +242,31 @@ export default async function DashboardPage({
 
       <RunBanner run={lastRun as IngestionRun | null} />
 
-      <nav className="filters">
-        {STATUS_FILTERS.map((filter) => (
-          <a
-            key={filter}
-            href={filter === "all" ? "/dashboard" : `/dashboard?status=${filter}`}
-            className={filter === statusFilter ? "active" : ""}
-          >
-            {filter[0].toUpperCase() + filter.slice(1)}
-          </a>
-        ))}
-      </nav>
+      <div className="filter-bar">
+        <nav className="filters">
+          {STATUS_FILTERS.map((filter) => (
+            <a
+              key={filter}
+              href={hrefFor({ status: filter })}
+              className={filter === statusFilter ? "active" : ""}
+            >
+              {filter[0].toUpperCase() + filter.slice(1)}
+            </a>
+          ))}
+        </nav>
+
+        <nav className="filters">
+          {SORT_OPTIONS.map((option) => (
+            <a
+              key={option}
+              href={hrefFor({ sort: option })}
+              className={option === sortOption ? "active" : ""}
+            >
+              {SORT_LABELS[option]}
+            </a>
+          ))}
+        </nav>
+      </div>
 
       {error && <p className="empty-state">Failed to load matches: {error.message}</p>}
 
@@ -283,7 +335,7 @@ export default async function DashboardPage({
         );
       })}
 
-      <Pagination page={page} totalPages={totalPages} statusFilter={statusFilter} />
+      <Pagination page={page} totalPages={totalPages} statusFilter={statusFilter} sortOption={sortOption} />
     </main>
   );
 }
