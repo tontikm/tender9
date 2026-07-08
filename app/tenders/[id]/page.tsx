@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
-import { getSupabaseServerClient } from "@/lib/supabase";
-import { getCurrentUser } from "@/lib/supabase-auth";
+import { getSupabaseAuthClient, getCurrentUser } from "@/lib/supabase-auth";
 import { updateMatchStatus } from "../../actions";
 import { IconBuilding, IconTag, IconMapPin, IconCalendar, IconCoin } from "../../components/icons";
 import { formatDate, formatDateTime, formatValue } from "@/lib/format";
@@ -37,7 +36,7 @@ export default async function TenderDetailPage({
 }) {
   const { id } = await params;
   const user = await getCurrentUser();
-  const supabase = getSupabaseServerClient();
+  const supabase = await getSupabaseAuthClient();
 
   const { data: tender } = await supabase
     .from("tenders")

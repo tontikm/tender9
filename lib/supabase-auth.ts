@@ -2,10 +2,12 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
 /**
- * Auth-aware Supabase client bound to the request's cookies — used for
- * reading/writing the user's session (sign in/up/out, getUser()).
- * Uses the anon key, unlike lib/supabase.ts's service-role client which
- * is for trusted server-side data operations, not session handling.
+ * Session-bound Supabase client (anon key + the signed-in user's cookies).
+ * Use this for everything user-facing — session handling (sign in/up/out,
+ * getUser()) AND data access on matching_profiles/tender_matches/tenders/
+ * ingestion_runs — since RLS policies key off auth.uid() from this client's
+ * JWT. lib/supabase.ts's service-role client bypasses RLS entirely and is
+ * reserved for the ingestion cron and cross-tenant matching logic.
  */
 export async function getSupabaseAuthClient() {
   const cookieStore = await cookies();

@@ -84,13 +84,62 @@ create table if not exists ingestion_runs (
   error_message text
 );
 
--- Enable RLS on everything. All access goes through server-side code
--- using the service role key (which bypasses RLS by design), so no
--- public policies are created here — per-user scoping (matching_profiles
--- .user_id) is enforced in the application layer, not by RLS. Do not add
--- public policies to these tables.
+-- Enable RLS on everything. User-facing pages/actions use a
+-- session-bound client (anon key + the signed-in user's JWT), so these
+-- policies are the real enforcement boundary, not just defense in depth.
+-- The service-role key (which bypasses RLS) is reserved for the
+-- ingestion cron and cross-tenant matching logic — the only things that
+-- legitimately need to read/write across every account at once.
 alter table tenders enable row level security;
 alter table matching_profiles enable row level security;
 alter table tender_matches enable row level security;
 alter table tender_drafts enable row level security;
 alter table ingestion_runs enable row level security;
+
+-- Tenders and ingestion run status are shared, non-sensitive system data —
+-- any signed-in user can read them, but only server-side code (service
+-- role) writes them.
+drop policy if exists "Authenticated users can read tenders" on tenders;
+create policy "Authenticated users can read tenders"
+  on tenders for select
+  to authenticated
+  using (true);
+
+drop policy if exists "Authenticated users can read ingestion runs" on ingestion_runs;
+create policy "Authenticated users can read ingestion runs"
+  on ingestion_runs for select
+  to authenticated
+  using (true);
+
+-- matching_profiles: an account only ever sees/manages its own profiles.
+drop policy if exists "Users manage their own matching profiles" on matching_profiles;
+create policy "Users manage their own matching profiles"
+  on matching_profiles for all
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- tender_matches has no user_id of its own — ownership flows through the
+-- owning matching_profiles row.
+drop policy if exists "Users manage matches for their own profiles" on tender_matches;
+create policy "Users manage matches for their own profiles"
+  on tender_matches for all
+  to authenticated
+  using (
+    exists (
+      select 1 from matching_profiles
+      where matching_profiles.id = tender_matches.profile_id
+      and matching_profiles.user_id = auth.uid()
+    )
+  )
+  with check (
+    exists (
+      select 1 from matching_profiles
+      where matching_profiles.id = tender_matches.profile_id
+      and matching_profiles.user_id = auth.uid()
+    )
+  );
+
+-- tender_drafts: no policy for the authenticated role — this feature is
+-- dormant (hidden UI, deferred to v2 per the project brief), so it stays
+-- reachable only via the service-role key until it's re-enabled.

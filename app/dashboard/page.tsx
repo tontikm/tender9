@@ -1,5 +1,4 @@
-import { getSupabaseServerClient } from "@/lib/supabase";
-import { getCurrentUser } from "@/lib/supabase-auth";
+import { getSupabaseAuthClient, getCurrentUser } from "@/lib/supabase-auth";
 import { updateMatchStatus } from "../actions";
 import { IconBuilding, IconTag, IconMapPin, IconCalendar, IconCoin } from "../components/icons";
 import { formatDate, formatValue } from "@/lib/format";
@@ -145,7 +144,7 @@ export default async function DashboardPage({
 
   const user = await getCurrentUser();
   const userId = user?.id ?? "";
-  const supabase = getSupabaseServerClient();
+  const supabase = await getSupabaseAuthClient();
 
   const { data: lastRun } = await supabase
     .from("ingestion_runs")
@@ -154,12 +153,22 @@ export default async function DashboardPage({
     .limit(1)
     .maybeSingle();
 
+  // PostgREST can't express "status IN (saved, applied) OR tenders.closing_date
+  // >= now" as a single query (mixing a parent-table and embedded-table
+  // condition in one OR isn't supported), so fetch the status-filtered set
+  // and apply the closing-date rule + pagination in application code. Match
+  // counts per user are in the hundreds, not thousands, so this is fine.
+  const nowIso = new Date().toISOString();
+  const isExpiredAndUnreviewed = (status: string, closingDate: string | null | undefined) => {
+    if (status !== "new") return false; // saved/applied/dismissed keep full history regardless of expiry
+    return !!closingDate && closingDate < nowIso;
+  };
+
   let query = supabase
     .from("tender_matches")
-    .select("id, match_score, status, tenders(*), matching_profiles!inner(name, user_id)", { count: "exact" })
+    .select("id, match_score, status, tenders!inner(*), matching_profiles!inner(name, user_id)")
     .eq("matching_profiles.user_id", userId)
-    .order("match_score", { ascending: false })
-    .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
+    .order("match_score", { ascending: false });
 
   if (statusFilter === "all") {
     query = query.neq("status", "dismissed");
@@ -167,17 +176,24 @@ export default async function DashboardPage({
     query = query.eq("status", statusFilter);
   }
 
-  const { data: matches, error, count } = await query.returns<MatchRow[]>();
-  const totalPages = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE));
+  const { data: allMatches, error } = await query.returns<MatchRow[]>();
+  const visibleMatches = (allMatches ?? []).filter(
+    (match) => !isExpiredAndUnreviewed(match.status, match.tenders?.closing_date)
+  );
+  const totalPages = Math.max(1, Math.ceil(visibleMatches.length / PAGE_SIZE));
+  const matches = visibleMatches.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const { data: allStatuses } = await supabase
     .from("tender_matches")
-    .select("status, matching_profiles!inner(user_id)")
-    .eq("matching_profiles.user_id", userId);
-  const statusCounts = (allStatuses ?? []).reduce<Record<string, number>>((acc, row) => {
-    acc[row.status] = (acc[row.status] ?? 0) + 1;
-    return acc;
-  }, {});
+    .select("status, tenders!inner(closing_date), matching_profiles!inner(user_id)")
+    .eq("matching_profiles.user_id", userId)
+    .returns<{ status: string; tenders: { closing_date: string | null } }[]>();
+  const statusCounts = (allStatuses ?? [])
+    .filter((row) => !isExpiredAndUnreviewed(row.status, row.tenders?.closing_date))
+    .reduce<Record<string, number>>((acc, row) => {
+      acc[row.status] = (acc[row.status] ?? 0) + 1;
+      return acc;
+    }, {});
 
   return (
     <main>

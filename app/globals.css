@@ -166,6 +166,16 @@ a {
   color: var(--color-text-faint);
 }
 
+.site-footer-inner a {
+  color: var(--color-text-faint);
+  text-decoration: none;
+}
+
+.site-footer-inner a:hover {
+  color: var(--color-text-muted);
+  text-decoration: underline;
+}
+
 /* ---------- Page layout ---------- */
 
 main {
@@ -775,6 +785,48 @@ button:hover,
   justify-content: space-between;
   align-items: flex-start;
   gap: 16px;
+}
+
+/* ---------- Legal pages (privacy policy, etc.) ---------- */
+
+.legal-main {
+  max-width: 720px;
+}
+
+.legal-main h2 {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 32px 0 12px;
+}
+
+.legal-main p {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--color-text);
+  margin: 0 0 14px;
+}
+
+.legal-main ul {
+  margin: 0 0 14px;
+  padding-left: 20px;
+}
+
+.legal-main li {
+  font-size: 14px;
+  line-height: 1.7;
+  margin-bottom: 6px;
+}
+
+.legal-main a {
+  color: var(--color-primary);
+}
+
+.legal-footnote {
+  font-size: 12px !important;
+  color: var(--color-text-faint) !important;
+  border-top: 1px solid var(--color-border);
+  padding-top: 16px;
+  margin-top: 32px !important;
 }
 
 /* ---------- Empty / error states ---------- */

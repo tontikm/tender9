@@ -61,6 +61,20 @@ export function scoreTenderAgainstProfile(
   return score;
 }
 
+// Supabase's gateway rejects .in("id", [...]) once the generated URL gets
+// too long — this starts failing somewhere between 200 and 500 UUIDs, well
+// within range for rematchAllTenders() once there are 500+ tenders. Chunk
+// both the SELECT and the upsert so this scales regardless of table size.
+const CHUNK_SIZE = 200;
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+
 /**
  * Runs all active matching profiles against a batch of tender rows and
  * upserts hits into tender_matches. Call this after upserting new/updated
@@ -79,13 +93,16 @@ export async function matchTenders(tenderIds: string[]): Promise<number> {
   if (profilesError) throw profilesError;
   if (!profiles || profiles.length === 0) return 0;
 
-  const { data: tenderRows, error: tendersError } = await supabase
-    .from("tenders")
-    .select("id, title, description, category, province, value_estimate")
-    .in("id", tenderIds);
+  const tenderRows: TenderRow[] = [];
+  for (const idChunk of chunk(tenderIds, CHUNK_SIZE)) {
+    const { data, error } = await supabase
+      .from("tenders")
+      .select("id, title, description, category, province, value_estimate")
+      .in("id", idChunk);
 
-  if (tendersError) throw tendersError;
-  if (!tenderRows) return 0;
+    if (error) throw error;
+    tenderRows.push(...(data ?? []));
+  }
 
   const matchesToInsert: {
     tender_id: string;
@@ -108,11 +125,13 @@ export async function matchTenders(tenderIds: string[]): Promise<number> {
 
   if (matchesToInsert.length === 0) return 0;
 
-  const { error: upsertError } = await supabase
-    .from("tender_matches")
-    .upsert(matchesToInsert, { onConflict: "tender_id,profile_id" });
+  for (const matchChunk of chunk(matchesToInsert, CHUNK_SIZE)) {
+    const { error: upsertError } = await supabase
+      .from("tender_matches")
+      .upsert(matchChunk, { onConflict: "tender_id,profile_id" });
 
-  if (upsertError) throw upsertError;
+    if (upsertError) throw upsertError;
+  }
 
   return matchesToInsert.length;
 }

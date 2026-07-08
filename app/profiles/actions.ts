@@ -1,8 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getSupabaseServerClient } from "@/lib/supabase";
-import { getCurrentUser } from "@/lib/supabase-auth";
+import { getSupabaseAuthClient, getCurrentUser } from "@/lib/supabase-auth";
 import { rematchAllTenders } from "@/lib/match";
 
 // One entry per line — comma-splitting breaks on values that contain commas
@@ -42,7 +41,7 @@ export async function saveProfile(formData: FormData) {
     active: formData.get("active") === "on",
   };
 
-  const supabase = getSupabaseServerClient();
+  const supabase = await getSupabaseAuthClient();
   const { error } = id
     ? await supabase.from("matching_profiles").update(record).eq("id", id).eq("user_id", user.id)
     : await supabase.from("matching_profiles").insert(record);
@@ -59,7 +58,7 @@ export async function deleteProfile(id: string) {
   const user = await getCurrentUser();
   if (!user) throw new Error("Not signed in");
 
-  const supabase = getSupabaseServerClient();
+  const supabase = await getSupabaseAuthClient();
   const { error } = await supabase.from("matching_profiles").delete().eq("id", id).eq("user_id", user.id);
   if (error) throw error;
 

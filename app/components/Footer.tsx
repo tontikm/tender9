@@ -3,7 +3,7 @@ export function Footer() {
     <footer className="site-footer">
       <div className="site-footer-inner">
         <span>&copy; {new Date().getFullYear()} Tender9</span>
-        <span>SA government tender monitoring</span>
+        <a href="/privacy">Privacy Policy</a>
       </div>
     </footer>
   );
