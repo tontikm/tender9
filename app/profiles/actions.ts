@@ -27,13 +27,24 @@ function parseNumber(value: FormDataEntryValue | null): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-export async function saveProfile(formData: FormData) {
+// Shape returned to the client form (via useActionState) so the UI can
+// collapse the editor on success or surface a message on failure, rather
+// than throwing an unstyled error overlay.
+export interface SaveProfileState {
+  ok: boolean;
+  error: string | null;
+}
+
+export async function saveProfile(
+  _prevState: SaveProfileState,
+  formData: FormData
+): Promise<SaveProfileState> {
   const user = await getCurrentUser();
-  if (!user) throw new Error("Not signed in");
+  if (!user) return { ok: false, error: "Not signed in" };
 
   const id = formData.get("id")?.toString() || null;
   const name = formData.get("name")?.toString().trim();
-  if (!name) throw new Error("Profile name is required");
+  if (!name) return { ok: false, error: "Profile name is required" };
 
   const record = {
     user_id: user.id,
@@ -52,12 +63,13 @@ export async function saveProfile(formData: FormData) {
     ? await supabase.from("matching_profiles").update(record).eq("id", id).eq("user_id", user.id)
     : await supabase.from("matching_profiles").insert(record);
 
-  if (error) throw error;
+  if (error) return { ok: false, error: error.message };
 
   await rematchAllTenders();
 
   revalidatePath("/profiles");
   revalidatePath("/dashboard");
+  return { ok: true, error: null };
 }
 
 export async function deleteProfile(id: string) {
