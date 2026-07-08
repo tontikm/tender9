@@ -994,6 +994,10 @@ button:hover,
 
 .form-field input[type="text"],
 .form-field input[type="number"],
+.form-field input[type="email"],
+.form-field input[type="tel"],
+.form-field input[type="date"],
+.form-field select,
 .form-field textarea {
   padding: 8px 11px;
   border: 1px solid var(--color-border-strong);
@@ -1006,10 +1010,34 @@ button:hover,
 }
 
 .form-field input:focus,
+.form-field select:focus,
 .form-field textarea:focus {
   outline: none;
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px var(--color-primary-bg);
+}
+
+.form-section {
+  margin-bottom: 24px;
+}
+
+.form-section-heading {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.form-success {
+  font-size: 13px;
+  color: var(--color-success);
+  background: var(--color-success-bg);
+  border: 1px solid var(--color-success-border);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  margin: 0 0 12px;
 }
 
 .form-field .hint {
