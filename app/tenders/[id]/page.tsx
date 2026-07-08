@@ -70,6 +70,9 @@ export default async function TenderDetailPage({
     <main>
       <nav className="page-nav">
         <a href="/dashboard">&larr; Back to matched tenders</a>
+        <a href={`/tenders/${tender.id}/bid-pack`} className="page-nav-cta">
+          Prepare SBD forms
+        </a>
       </nav>
 
       <h1>{tender.title}</h1>
