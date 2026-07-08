@@ -58,6 +58,9 @@ export interface SbdForm {
   title: string;
   intro?: string;
   sections: SbdSection[];
+  // Yes/No declaration statements the bidder must answer by hand (SBD 4/8) —
+  // rendered with tick boxes, since we can't answer them on the bidder's behalf.
+  questions?: string[];
   // Parts the bidder must still complete/answer by hand (we can't auto-fill).
   manualNotes?: string[];
   // Declaration signed at the foot of the form.
@@ -203,6 +206,90 @@ function buildSbd61(company: SbdCompany, tender: SbdTender): SbdForm {
   };
 }
 
+function buildSbd4(company: SbdCompany, tender: SbdTender): SbdForm {
+  return {
+    code: "SBD 4",
+    title: "Declaration of Interest",
+    intro:
+      "Any legal person, including persons employed by the state, or persons connected to a bidder, must declare any conflict of interest that may arise from being awarded this bid. This form must be completed and submitted with the bid.",
+    sections: [
+      {
+        heading: "Bidder & authorised person",
+        fields: [
+          { label: "Full name of bidder", value: company.legal_name },
+          { label: "Company registration number", value: company.registration_number },
+          { label: "Tax reference / TCS PIN", value: company.tax_compliance_pin },
+          { label: "Name of authorised person", value: company.signatory_name },
+          { label: "Position held", value: company.signatory_capacity },
+        ],
+      },
+    ],
+    questions: [
+      "Are you or any person connected with the bidder presently employed by the state?",
+      "Do you or any person connected with the bidder have any relationship (family, friend, other) with a person employed by the organ of state and involved in the evaluation and/or adjudication of this bid?",
+      "Are you or any person connected with the bidder aware of any relationship between yourself and any person employed by the organ of state who may be involved in this bid?",
+      "Do you or any person connected with the bidder have any interest in any other bidder submitting a bid for this contract?",
+    ],
+    manualNotes: [
+      "For each question above, tick Yes or No. If Yes to any, attach full particulars (names, ID numbers, nature of the relationship/interest) on a separate signed sheet.",
+      "List the ID numbers of all directors/members/shareholders — Tender9 does not store these.",
+    ],
+    declaration:
+      "I, the undersigned, certify that the information furnished on this declaration is correct, and I accept that the state may reject the bid or act against me should this declaration prove to be false.",
+  };
+}
+
+function buildSbd8(company: SbdCompany, tender: SbdTender): SbdForm {
+  return {
+    code: "SBD 8",
+    title: "Declaration of Bidder's Past Supply Chain Management Practices",
+    intro:
+      "This declaration will be taken into account in the evaluation of the bid. It serves as a declaration of the bidder's past supply chain management practices.",
+    sections: [
+      {
+        heading: "Bidder",
+        fields: [
+          { label: "Name of bidder", value: company.legal_name },
+          { label: "Bid / tender number", value: tenderReference(tender) },
+        ],
+      },
+    ],
+    questions: [
+      "Is the bidder, or any of its directors, listed on the National Treasury Register for Tender Defaulters or the Database of Restricted Suppliers (prohibited from doing business with the public sector)?",
+      "Has the bidder, or any of its directors, been convicted of fraud or corruption by a court of law (including a court outside South Africa) in the past five years?",
+      "Was any contract between the bidder and an organ of state terminated during the past five years on account of failure to perform in terms of the contract?",
+      "Has the bidder, or any of its directors, abused the supply chain management system or committed a fraudulent or other improper act in relation to such system?",
+    ],
+    manualNotes: [
+      "Tick Yes or No for each statement above. If Yes to any, provide full particulars on a separate signed sheet.",
+    ],
+    declaration:
+      "I, the undersigned, certify that the information furnished above is correct. I accept that, in addition to cancellation of a contract, action may be taken against me should this declaration prove to be false.",
+  };
+}
+
+function buildSbd9(company: SbdCompany, tender: SbdTender): SbdForm {
+  return {
+    code: "SBD 9",
+    title: "Certificate of Independent Bid Determination",
+    intro:
+      "Section 4 (1) (b) (iii) of the Competition Act prohibits collusive bidding. This certificate must be submitted with the bid.",
+    sections: [
+      {
+        heading: "Bidder",
+        fields: [
+          { label: "Name of bidder", value: company.legal_name },
+          { label: "Bid / tender number", value: tenderReference(tender) },
+          { label: "Authorised signatory", value: company.signatory_name },
+          { label: "Capacity / position", value: company.signatory_capacity },
+        ],
+      },
+    ],
+    declaration:
+      "I, the undersigned, in submitting the accompanying bid, certify that: I am authorised by the bidder to sign this certificate and to submit this bid on its behalf; each price in this bid has been arrived at independently, without consultation, communication, agreement or arrangement with any competitor; the prices have not been and will not be disclosed to any competitor before bid opening; and no attempt has been made to induce any other party to submit or not submit a bid for the purpose of restricting competition.",
+  };
+}
+
 const REQUIRED_FIELDS: { key: keyof SbdCompany; label: string }[] = [
   { key: "legal_name", label: "Registered company name" },
   { key: "registration_number", label: "CIPC registration number" },
@@ -221,7 +308,13 @@ export function buildBidPack(company: SbdCompany, tender: SbdTender): BidPack {
     company,
     tender,
     generatedOn: formatDate(new Date().toISOString()),
-    forms: [buildSbd1(company, tender), buildSbd61(company, tender)],
+    forms: [
+      buildSbd1(company, tender),
+      buildSbd4(company, tender),
+      buildSbd61(company, tender),
+      buildSbd8(company, tender),
+      buildSbd9(company, tender),
+    ],
     missingFields,
   };
 }

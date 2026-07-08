@@ -29,6 +29,23 @@ function FormBlock({ form }: { form: SbdForm }) {
         </div>
       ))}
 
+      {form.questions && form.questions.length > 0 && (
+        <div className="sbd-section">
+          <h3 className="sbd-section-heading">Declarations — tick one per statement</h3>
+          <ol className="sbd-questions">
+            {form.questions.map((q) => (
+              <li key={q}>
+                <span className="sbd-question-text">{q}</span>
+                <span className="sbd-question-boxes">
+                  <span className="sbd-box">&#9633; Yes</span>
+                  <span className="sbd-box">&#9633; No</span>
+                </span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+
       {form.manualNotes && form.manualNotes.length > 0 && (
         <div className="sbd-manual">
           <h4>To complete by hand</h4>
