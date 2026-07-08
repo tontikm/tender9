@@ -975,6 +975,88 @@ button:hover,
   background: var(--color-danger-bg) !important;
 }
 
+.form-footer-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cancel-button {
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+}
+
+/* ---------- Collapsed profile summary rows ---------- */
+
+.profile-summary {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.profile-summary:hover {
+  background: transparent;
+}
+
+.profile-summary-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.profile-summary-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.profile-summary-meta {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.profile-summary-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.profile-summary-edit {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-primary);
+}
+
+.profile-summary:hover .profile-summary-edit {
+  text-decoration: underline;
+}
+
+.add-profile-button {
+  width: 100%;
+  padding: 16px;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--color-primary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.add-profile-button:hover {
+  background: var(--color-surface);
+  border-color: var(--color-primary);
+}
+
 /* ---------- Nav helper (used inline within a page, if needed) ---------- */
 
 .page-nav {
