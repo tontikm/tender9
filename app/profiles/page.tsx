@@ -7,6 +7,18 @@ export const dynamic = "force-dynamic";
 // timeout as the tenders table grows, same reasoning as api/ingest/route.ts.
 export const maxDuration = 60;
 
+const SA_PROVINCES = [
+  "Eastern Cape",
+  "Free State",
+  "Gauteng",
+  "KwaZulu-Natal",
+  "Limpopo",
+  "Mpumalanga",
+  "North West",
+  "Northern Cape",
+  "Western Cape",
+];
+
 interface Profile {
   id: string;
   name: string;
@@ -19,8 +31,16 @@ interface Profile {
   active: boolean;
 }
 
-function ProfileForm({ profile }: { profile: Profile | null }) {
+function ProfileForm({
+  profile,
+  availableCategories,
+}: {
+  profile: Profile | null;
+  availableCategories: string[];
+}) {
   const formId = `profile-form-${profile?.id ?? "new"}`;
+  const selectedCategories = new Set(profile?.categories ?? []);
+  const selectedProvinces = new Set(profile?.provinces ?? []);
 
   return (
     <>
@@ -39,17 +59,46 @@ function ProfileForm({ profile }: { profile: Profile | null }) {
         </div>
 
         <div className="form-field full">
-          <label>Categories (one per line, must match exactly)</label>
-          <textarea name="categories" rows={4} defaultValue={profile?.categories?.join("\n") ?? ""} />
-          <span className="hint">
-            e.g. Supplies: Computer Equipment (one full category name per line — some category
-            names contain commas, so don&apos;t split them) (+2 pts on exact match)
-          </span>
+          <label>Categories</label>
+          <div className="checkbox-list">
+            {availableCategories.map((category) => {
+              const checkboxId = `${formId}-category-${category}`;
+              return (
+                <span className="checkbox-list-item" key={category}>
+                  <input
+                    type="checkbox"
+                    name="categories"
+                    value={category}
+                    id={checkboxId}
+                    defaultChecked={selectedCategories.has(category)}
+                  />
+                  <label htmlFor={checkboxId}>{category}</label>
+                </span>
+              );
+            })}
+          </div>
+          <span className="hint">Select the tender categories relevant to your business (+2 pts on match).</span>
         </div>
 
         <div className="form-field full">
-          <label>Provinces (one per line, leave blank for national)</label>
-          <textarea name="provinces" rows={2} defaultValue={profile?.provinces?.join("\n") ?? ""} />
+          <label>Provinces (leave all unchecked for national)</label>
+          <div className="checkbox-list checkbox-list-inline">
+            {SA_PROVINCES.map((province) => {
+              const checkboxId = `${formId}-province-${province}`;
+              return (
+                <span className="checkbox-list-item" key={province}>
+                  <input
+                    type="checkbox"
+                    name="provinces"
+                    value={province}
+                    id={checkboxId}
+                    defaultChecked={selectedProvinces.has(province)}
+                  />
+                  <label htmlFor={checkboxId}>{province}</label>
+                </span>
+              );
+            })}
+          </div>
         </div>
 
         <div className="form-field">
@@ -100,6 +149,28 @@ function ProfileForm({ profile }: { profile: Profile | null }) {
   );
 }
 
+async function fetchDistinctCategories(
+  supabase: Awaited<ReturnType<typeof getSupabaseAuthClient>>
+): Promise<string[]> {
+  const categories = new Set<string>();
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from("tenders")
+      .select("category")
+      .not("category", "is", null)
+      .range(from, from + pageSize - 1);
+
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    for (const row of data) {
+      if (row.category) categories.add(row.category);
+    }
+    if (data.length < pageSize) break;
+  }
+  return Array.from(categories).sort((a, b) => a.localeCompare(b));
+}
+
 export default async function ProfilesPage() {
   const user = await getCurrentUser();
   const supabase = await getSupabaseAuthClient();
@@ -109,6 +180,8 @@ export default async function ProfilesPage() {
     .eq("user_id", user?.id ?? "")
     .order("created_at", { ascending: true })
     .returns<Profile[]>();
+
+  const availableCategories = await fetchDistinctCategories(supabase);
 
   return (
     <main>
@@ -122,13 +195,13 @@ export default async function ProfilesPage() {
 
       {profiles?.map((profile) => (
         <article className={`profile-card ${profile.active ? "" : "inactive"}`} key={profile.id}>
-          <ProfileForm profile={profile} />
+          <ProfileForm profile={profile} availableCategories={availableCategories} />
         </article>
       ))}
 
       <article className="profile-card">
         <h3 style={{ marginTop: 0 }}>Add a new profile</h3>
-        <ProfileForm profile={null} />
+        <ProfileForm profile={null} availableCategories={availableCategories} />
       </article>
     </main>
   );
