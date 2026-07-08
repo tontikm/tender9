@@ -1,8 +1,11 @@
-import { getSupabaseServerClient } from "@/lib/supabase";
-import { getCurrentUser } from "@/lib/supabase-auth";
+import { getSupabaseAuthClient, getCurrentUser } from "@/lib/supabase-auth";
 import { saveProfile, deleteProfile } from "./actions";
 
 export const dynamic = "force-dynamic";
+// saveProfile/deleteProfile call rematchAllTenders(), which re-scores every
+// tender in the table — can take longer than Vercel's default function
+// timeout as the tenders table grows, same reasoning as api/ingest/route.ts.
+export const maxDuration = 60;
 
 interface Profile {
   id: string;
@@ -99,7 +102,7 @@ function ProfileForm({ profile }: { profile: Profile | null }) {
 
 export default async function ProfilesPage() {
   const user = await getCurrentUser();
-  const supabase = getSupabaseServerClient();
+  const supabase = await getSupabaseAuthClient();
   const { data: profiles, error } = await supabase
     .from("matching_profiles")
     .select("*")

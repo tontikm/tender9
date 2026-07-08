@@ -1,5 +1,4 @@
-import { getSupabaseServerClient } from "@/lib/supabase";
-import { getCurrentUser } from "@/lib/supabase-auth";
+import { getSupabaseAuthClient, getCurrentUser } from "@/lib/supabase-auth";
 import { updateMatchStatus } from "../actions";
 import { IconBuilding, IconTag, IconMapPin, IconCalendar, IconCoin } from "../components/icons";
 import { formatDate, formatValue } from "@/lib/format";
@@ -145,7 +144,7 @@ export default async function DashboardPage({
 
   const user = await getCurrentUser();
   const userId = user?.id ?? "";
-  const supabase = getSupabaseServerClient();
+  const supabase = await getSupabaseAuthClient();
 
   const { data: lastRun } = await supabase
     .from("ingestion_runs")
