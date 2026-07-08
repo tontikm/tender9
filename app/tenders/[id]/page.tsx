@@ -1,10 +1,17 @@
 import { notFound } from "next/navigation";
 import { getSupabaseAuthClient, getCurrentUser } from "@/lib/supabase-auth";
 import { updateMatchStatus } from "../../actions";
-import { IconBuilding, IconTag, IconMapPin, IconCalendar, IconCoin } from "../../components/icons";
+import { IconBuilding, IconTag, IconMapPin, IconCoin } from "../../components/icons";
 import { formatDate, formatDateTime, formatValue } from "@/lib/format";
+import { extractRequirements } from "@/lib/requirements";
 
 export const dynamic = "force-dynamic";
+
+const CATEGORY_LABELS: Record<string, string> = {
+  goods: "goods",
+  services: "services",
+  works: "works / construction",
+};
 
 interface Tender {
   id: string;
@@ -20,6 +27,7 @@ interface Tender {
   briefing_date: string | null;
   published_date: string | null;
   document_urls: string[] | null;
+  raw_payload: unknown;
 }
 
 interface MatchRow {
@@ -41,12 +49,14 @@ export default async function TenderDetailPage({
   const { data: tender } = await supabase
     .from("tenders")
     .select(
-      "id, title, description, buyer_name, category, province, value_estimate, currency, status, closing_date, briefing_date, published_date, document_urls"
+      "id, title, description, buyer_name, category, province, value_estimate, currency, status, closing_date, briefing_date, published_date, document_urls, raw_payload"
     )
     .eq("id", id)
     .maybeSingle<Tender>();
 
   if (!tender) notFound();
+
+  const requirements = extractRequirements(tender.raw_payload);
 
   const { data: matches } = await supabase
     .from("tender_matches")
@@ -123,6 +133,84 @@ export default async function TenderDetailPage({
           </ul>
         </>
       )}
+
+      <details className="requirements">
+        <summary className="requirements-toggle">
+          View requirements &amp; how to qualify
+        </summary>
+
+        <div className="requirements-body">
+          {requirements.specialConditions && (
+            <section className="requirements-section">
+              <h4 className="requirements-heading tender-specific">
+                Special conditions for this tender
+              </h4>
+              <p className="requirements-note">
+                Set by the buyer. Not meeting these makes your bid non-responsive.
+              </p>
+              <p className="requirements-special">{requirements.specialConditions}</p>
+            </section>
+          )}
+
+          {requirements.briefing && (
+            <section className="requirements-section">
+              <h4 className="requirements-heading tender-specific">
+                Briefing session{requirements.briefing.compulsory ? " (compulsory)" : ""}
+              </h4>
+              <p className="requirements-note">
+                {requirements.briefing.compulsory
+                  ? "Attendance is mandatory — miss it and your bid will be disqualified."
+                  : "Attendance is optional but recommended."}
+                {requirements.briefing.venue ? ` Venue: ${requirements.briefing.venue}.` : ""}
+                {tender.briefing_date
+                  ? ` Date: ${formatDateTime(tender.briefing_date)}.`
+                  : ""}
+              </p>
+            </section>
+          )}
+
+          <section className="requirements-section">
+            <h4 className="requirements-heading">
+              Documents you&apos;ll typically need
+              {requirements.mainCategory && CATEGORY_LABELS[requirements.mainCategory.toLowerCase()]
+                ? ` (${CATEGORY_LABELS[requirements.mainCategory.toLowerCase()]})`
+                : ""}
+            </h4>
+            <ul className="requirements-list">
+              {requirements.standardDocuments.map((doc) => (
+                <li key={doc}>{doc}</li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="requirements-section">
+            <h4 className="requirements-heading">Standard SBD forms</h4>
+            <ul className="requirements-list">
+              {requirements.sbdForms.map((form) => (
+                <li key={form.code}>
+                  <strong>{form.code}</strong> — {form.title}
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="requirements-section">
+            <h4 className="requirements-heading">What can disqualify you</h4>
+            <ul className="requirements-list disqualifiers">
+              {requirements.disqualifiers.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </section>
+
+          <p className="requirements-disclaimer">
+            The special conditions and briefing details above come straight from the tender
+            feed. The document, SBD-form and disqualification lists are general guidance based
+            on standard South African government procurement rules — always confirm the exact
+            requirements in the official tender document before submitting.
+          </p>
+        </div>
+      </details>
 
       {matches && matches.length > 0 && (
         <>
