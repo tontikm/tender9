@@ -14,6 +14,12 @@ function parseList(value: FormDataEntryValue | null): string[] {
     .filter(Boolean);
 }
 
+// Categories/provinces are now checkbox groups (not free text), so every
+// checked box comes through as its own "categories"/"provinces" form field.
+function parseCheckboxList(formData: FormData, name: string): string[] {
+  return formData.getAll(name).map((v) => v.toString());
+}
+
 function parseNumber(value: FormDataEntryValue | null): number | null {
   const str = value?.toString().trim();
   if (!str) return null;
@@ -33,8 +39,8 @@ export async function saveProfile(formData: FormData) {
     user_id: user.id,
     name,
     keywords: parseList(formData.get("keywords")),
-    categories: parseList(formData.get("categories")),
-    provinces: parseList(formData.get("provinces")),
+    categories: parseCheckboxList(formData, "categories"),
+    provinces: parseCheckboxList(formData, "provinces"),
     min_value: parseNumber(formData.get("min_value")),
     max_value: parseNumber(formData.get("max_value")),
     cidb_grade: formData.get("cidb_grade")?.toString().trim() || null,
