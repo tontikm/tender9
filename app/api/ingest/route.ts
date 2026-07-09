@@ -1,10 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase";
-import { fetchOcdsReleases, normalizeRelease } from "@/lib/ocds";
+import {
+  fetchOcdsReleases,
+  normalizeRelease,
+  DEFAULT_LOOKBACK_DAYS,
+  type NormalizedTender,
+} from "@/lib/ocds";
 import { matchTenders } from "@/lib/match";
 
 export const dynamic = "force-dynamic"; // never cache — this must run fresh every time
 export const maxDuration = 60; // seconds; adjust in vercel.json / plan limits if needed
+
+// Never try to catch up more than this in one run — bounds the work so a run
+// can't blow the 60s timeout after a gap. With a daily cron the real window
+// is ~1 day (~13s); a ~10-day catch-up already approaches the limit, so cap
+// well under that. If the cron is down longer than this, the oldest tail is
+// skipped rather than risk a run that times out and never marks success.
+const MAX_CATCHUP_DAYS = 7;
+
+const UPSERT_CHUNK = 500;
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
+function isoDay(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
 
 /**
  * GET /api/ingest
@@ -36,52 +60,80 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Find the last successful run to fetch only new/updated releases since then.
-    const { data: lastRun } = await supabase
-      .from("ingestion_runs")
-      .select("finished_at")
-      .eq("source", "etenders_ocds")
-      .eq("status", "success")
-      .order("finished_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    // Date range to fetch. Query params (?from=&to=, YYYY-MM-DD) allow a
+    // manual targeted run; otherwise fetch from the last *successful* run's
+    // day up to today — using "last success" (not "last run") means a hung or
+    // failed run never opens a permanent gap, since the next run re-covers it.
+    const url = new URL(request.url);
+    const fromParam = url.searchParams.get("from");
+    const toParam = url.searchParams.get("to");
 
-    const releases = await fetchOcdsReleases(lastRun?.finished_at ?? undefined);
+    const today = isoDay(new Date());
+    let dateFrom: string;
+    let dateTo: string;
 
-    let newCount = 0;
-    let updatedCount = 0;
-    const affectedIds: string[] = [];
-
-    for (const release of releases) {
-      const normalized = normalizeRelease(release);
-      if (!normalized) continue;
-
-      const { data: existing } = await supabase
-        .from("tenders")
-        .select("id")
-        .eq("source", normalized.source)
-        .eq("external_id", normalized.external_id)
+    if (fromParam && toParam) {
+      dateFrom = fromParam;
+      dateTo = toParam;
+    } else {
+      const { data: lastRun } = await supabase
+        .from("ingestion_runs")
+        .select("finished_at")
+        .eq("source", "etenders_ocds")
+        .eq("status", "success")
+        .order("finished_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
 
+      dateTo = today;
+      const sinceDay = lastRun?.finished_at
+        ? lastRun.finished_at.slice(0, 10)
+        : isoDay(new Date(Date.now() - DEFAULT_LOOKBACK_DAYS * 86_400_000));
+      // Bound the catch-up so a long outage can't produce a run that times out.
+      const floorDay = isoDay(new Date(Date.now() - MAX_CATCHUP_DAYS * 86_400_000));
+      dateFrom = sinceDay < floorDay ? floorDay : sinceDay;
+    }
+
+    const releases = await fetchOcdsReleases(dateFrom, dateTo);
+
+    // Normalize and dedupe by (source, external_id) — Postgres upsert can't
+    // touch the same conflict target twice in one statement, and our date
+    // windows can legitimately return the same ocid at their edges.
+    const normalizedById = new Map<string, NormalizedTender>();
+    for (const release of releases) {
+      const n = normalizeRelease(release);
+      if (n) normalizedById.set(`${n.source}:${n.external_id}`, n);
+    }
+    const records = [...normalizedById.values()];
+
+    // Which of these already exist? (for the new-vs-updated stat only)
+    const existingExternalIds = new Set<string>();
+    for (const idChunk of chunk(records.map((r) => r.external_id), 200)) {
+      const { data } = await supabase
+        .from("tenders")
+        .select("external_id")
+        .eq("source", "etenders_ocds")
+        .in("external_id", idChunk);
+      for (const row of data ?? []) existingExternalIds.add(row.external_id);
+    }
+
+    const nowTs = new Date().toISOString();
+    const affectedIds: string[] = [];
+    for (const recChunk of chunk(records, UPSERT_CHUNK)) {
       const { data: upserted, error: upsertError } = await supabase
         .from("tenders")
         .upsert(
-          { ...normalized, updated_at: new Date().toISOString() },
+          recChunk.map((r) => ({ ...r, updated_at: nowTs })),
           { onConflict: "source,external_id" }
         )
-        .select("id")
-        .single();
+        .select("id");
 
-      if (upsertError || !upserted) {
-        // Don't let one bad record kill the whole batch — log and continue.
-        console.error("Failed to upsert tender", normalized.external_id, upsertError);
-        continue;
-      }
-
-      affectedIds.push(upserted.id);
-      if (existing) updatedCount += 1;
-      else newCount += 1;
+      if (upsertError) throw upsertError;
+      affectedIds.push(...(upserted ?? []).map((r) => r.id));
     }
+
+    const newCount = records.filter((r) => !existingExternalIds.has(r.external_id)).length;
+    const updatedCount = records.length - newCount;
 
     const matchCount = await matchTenders(affectedIds);
 
