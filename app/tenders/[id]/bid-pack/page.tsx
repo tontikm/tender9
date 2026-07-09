@@ -124,7 +124,12 @@ export default async function BidPackPage({ params }: { params: Promise<{ id: st
     <main className="bid-pack">
       <div className="bid-pack-toolbar">
         <a href={`/tenders/${id}`}>&larr; Back to tender</a>
-        <PrintButton />
+        <span className="bid-pack-toolbar-actions">
+          <a href={`/tenders/${id}/bid-pack/pdf`} className="download-pdf-button">
+            Download PDF
+          </a>
+          <PrintButton />
+        </span>
       </div>
 
       {(!company || pack.missingFields.length > 0) && (
