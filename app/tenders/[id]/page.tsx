@@ -4,6 +4,8 @@ import { updateMatchStatus } from "../../actions";
 import { IconBuilding, IconTag, IconMapPin, IconCoin } from "../../components/icons";
 import { formatDate, formatDateTime, formatValue } from "@/lib/format";
 import { extractRequirements } from "@/lib/requirements";
+import { describeDocuments } from "@/lib/tender-docs";
+import { TenderDocuments } from "./TenderDocuments";
 
 export const dynamic = "force-dynamic";
 
@@ -140,15 +142,7 @@ export default async function TenderDetailPage({
       {tender.document_urls && tender.document_urls.length > 0 && (
         <>
           <h3 className="section-heading">Documents</h3>
-          <ul className="document-list">
-            {tender.document_urls.map((url) => (
-              <li key={url}>
-                <a href={url} target="_blank" rel="noreferrer">
-                  {url}
-                </a>
-              </li>
-            ))}
-          </ul>
+          <TenderDocuments tenderId={tender.id} documents={describeDocuments(tender.document_urls)} />
         </>
       )}
 
