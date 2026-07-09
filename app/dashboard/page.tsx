@@ -33,6 +33,7 @@ interface MatchRow {
   id: string;
   match_score: number | null;
   status: string;
+  viewed_at: string | null;
   tenders: TenderRow | null;
   matching_profiles: { name: string } | null;
 }
@@ -189,7 +190,7 @@ export default async function DashboardPage({
 
   let query = supabase
     .from("tender_matches")
-    .select("id, match_score, status, tenders!inner(*), matching_profiles!inner(name, user_id)")
+    .select("id, match_score, status, viewed_at, tenders!inner(*), matching_profiles!inner(name, user_id)")
     .eq("matching_profiles.user_id", userId)
     .order("match_score", { ascending: false });
 
@@ -279,7 +280,7 @@ export default async function DashboardPage({
         if (!tender) return null;
 
         return (
-          <article className="match-card" key={match.id}>
+          <article className={`match-card${match.viewed_at ? " viewed" : ""}`} key={match.id}>
             <div className="match-card-header">
               <div>
                 <h3 className="match-title">
@@ -309,6 +310,7 @@ export default async function DashboardPage({
                 </div>
               </div>
               <div className="badges">
+                {match.viewed_at && <span className="badge viewed">Viewed</span>}
                 <span className="badge score">Score {match.match_score ?? 0}</span>
                 <span className={`badge status-${match.status}`}>{match.status}</span>
               </div>

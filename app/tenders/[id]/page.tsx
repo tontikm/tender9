@@ -66,6 +66,16 @@ export default async function TenderDetailPage({
     .order("match_score", { ascending: false })
     .returns<MatchRow[]>();
 
+  // Mark this tender as viewed for the current user the first time they open
+  // it, so the dashboard can show which tenders they've already looked at.
+  // RLS scopes the update to the user's own matches; `.is("viewed_at", null)`
+  // means only the first view is recorded and re-visits don't overwrite it.
+  await supabase
+    .from("tender_matches")
+    .update({ viewed_at: new Date().toISOString() })
+    .eq("tender_id", id)
+    .is("viewed_at", null);
+
   return (
     <main>
       <nav className="page-nav">
