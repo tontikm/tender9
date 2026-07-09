@@ -436,6 +436,22 @@ h1 {
   border-color: var(--color-border-strong);
 }
 
+/* Already-opened tenders are de-emphasised so unseen ones stand out. */
+.match-card.viewed {
+  background: var(--color-neutral-bg);
+  box-shadow: none;
+}
+
+.match-card.viewed .match-title a {
+  color: var(--color-text-muted);
+}
+
+.badge.viewed {
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+}
+
 .match-card-header {
   position: relative;
   display: flex;

@@ -87,6 +87,7 @@ create table if not exists tender_matches (
   match_score numeric,
   status text default 'new',          -- 'new' | 'saved' | 'dismissed' | 'applied'
   notified_at timestamptz,
+  viewed_at timestamptz,              -- first time the owning user opened the tender detail
   created_at timestamptz default now(),
   unique (tender_id, profile_id)
 );
