@@ -1,4 +1,5 @@
-import { signIn } from "./actions";
+import { signIn, signInWithGoogle } from "./actions";
+import { GoogleButton } from "../components/GoogleButton";
 
 export default async function LoginPage({
   searchParams,
@@ -15,6 +16,14 @@ export default async function LoginPage({
 
         {params.message && <p className="auth-notice">{params.message}</p>}
         {params.error && <p className="auth-error">{params.error}</p>}
+
+        <form action={signInWithGoogle}>
+          <GoogleButton>Continue with Google</GoogleButton>
+        </form>
+
+        <div className="auth-divider">
+          <span>or</span>
+        </div>
 
         <form action={signIn} className="auth-form">
           <div className="form-field">
