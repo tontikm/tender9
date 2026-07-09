@@ -14,6 +14,7 @@ export async function Header() {
         {user && (
           <nav className="site-nav">
             <a href="/dashboard">Tenders</a>
+            <a href="/browse">Browse</a>
             <a href="/profiles">Profiles</a>
             <a href="/company">Company</a>
             <form action={signOut}>
