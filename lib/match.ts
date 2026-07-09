@@ -113,7 +113,13 @@ export async function matchTenders(tenderIds: string[]): Promise<number> {
   for (const tenderRow of tenderRows) {
     for (const profile of profiles as MatchingProfile[]) {
       const score = scoreTenderAgainstProfile(tenderRow, profile);
-      if (score > 0) {
+      // When a profile specifies categories, require a real signal — a
+      // category match or a title-keyword match, both worth 2 — so a single
+      // stray keyword in a long description can't pull in out-of-category
+      // tenders (e.g. an electrical/construction bid that happens to mention
+      // "cabling" or "UPS"). Keyword-only profiles keep the looser threshold.
+      const minScore = (profile.categories?.length ?? 0) > 0 ? 2 : 1;
+      if (score >= minScore) {
         matchesToInsert.push({
           tender_id: tenderRow.id,
           profile_id: profile.id,
