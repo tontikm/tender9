@@ -4,12 +4,13 @@ import { revalidatePath } from "next/cache";
 import { getSupabaseAuthClient, getCurrentUser } from "@/lib/supabase-auth";
 import { rematchAllTenders } from "@/lib/match";
 
-// One entry per line — comma-splitting breaks on values that contain commas
-// themselves, which real OCDS category names do (e.g. "Computer programming,
-// consultancy and related activities" is a single category, not two).
-function parseList(value: FormDataEntryValue | null): string[] {
+// Keywords are the user's own search terms, so accept whatever separator they
+// reach for — newlines AND commas (people naturally type "ict, computers,
+// hardware"). Categories, which can legitimately contain commas, are a
+// separate checkbox field, so splitting on commas here is safe.
+function parseKeywords(value: FormDataEntryValue | null): string[] {
   return (value?.toString() ?? "")
-    .split("\n")
+    .split(/[\n,]/)
     .map((s) => s.trim())
     .filter(Boolean);
 }
@@ -49,7 +50,7 @@ export async function saveProfile(
   const record = {
     user_id: user.id,
     name,
-    keywords: parseList(formData.get("keywords")),
+    keywords: parseKeywords(formData.get("keywords")),
     categories: parseCheckboxList(formData, "categories"),
     provinces: parseCheckboxList(formData, "provinces"),
     min_value: parseNumber(formData.get("min_value")),
