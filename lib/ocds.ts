@@ -15,50 +15,30 @@ const OCDS_RELEASES_PATH = "/api/OCDSReleases";
 // large page sizes (up to 20000), but in practice PageSize values above a
 // few hundred make the API take 40s+ per page — stick to its own default.
 //
-// The API also has a server-side pagination bug: each subsequent page gets
-// linearly slower (page 1 ~3s, page 18 ~32s) regardless of PageSize, and
+// The API also has a server-side pagination bug: within a single query, each
+// subsequent page gets linearly slower (page 1 ~3s, page 18 ~32s) and
 // `links.next` keeps appearing well past where the release count should be
-// exhausted. MAX_PAGES is a hard safety cap so one ingestion run can't hang
-// for minutes; a small DEFAULT_LOOKBACK_DAYS keeps the first (no prior run)
-// backfill shallow enough to actually finish. Subsequent runs only cover
-// the gap since the last successful run, so this doesn't lose data —
-// scheduled runs just need to happen often enough to stay within the window.
-const DEFAULT_LOOKBACK_DAYS = 2;
+// exhausted. To stay reliable we fetch the requested range in small date
+// WINDOWS, each paginated from page 1 — so no single sequence ever gets deep
+// enough to slow to a crawl, and no window holds enough releases to hit the
+// per-window page cap and silently truncate. This is what keeps ingestion
+// from dropping tenders on wider catch-up runs.
+export const DEFAULT_LOOKBACK_DAYS = 3;
+const WINDOW_DAYS = 3;
 const PAGE_SIZE = 100;
-const MAX_PAGES = 10;
+const MAX_PAGES_PER_WINDOW = 15;
 
-export interface NormalizedTender {
-  source: string;
-  external_id: string;
-  title: string;
-  description: string | null;
-  buyer_name: string | null;
-  category: string | null;
-  province: string | null;
-  value_estimate: number | null;
-  currency: string;
-  status: string | null;
-  closing_date: string | null;
-  briefing_date: string | null;
-  published_date: string | null;
-  document_urls: string[];
-  raw_payload: unknown;
+function isoDay(date: Date): string {
+  return date.toISOString().slice(0, 10);
 }
 
-/**
- * Fetches releases from the OCDS API.
- * `sinceDate` should be an ISO date string — pass the last successful
- * ingestion run's timestamp to avoid re-fetching everything each time,
- * once you've confirmed the API supports a date filter param.
- */
-export async function fetchOcdsReleases(sinceDate?: string): Promise<unknown[]> {
-  const dateTo = new Date().toISOString().slice(0, 10);
-  const dateFrom = sinceDate
-    ? sinceDate.slice(0, 10)
-    : new Date(Date.now() - DEFAULT_LOOKBACK_DAYS * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .slice(0, 10);
+function addDays(day: string, n: number): string {
+  const d = new Date(`${day}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return isoDay(d);
+}
 
+async function fetchWindow(dateFrom: string, dateTo: string): Promise<unknown[]> {
   const releases: unknown[] = [];
   let url = `${OCDS_BASE_URL}${OCDS_RELEASES_PATH}?${new URLSearchParams({
     dateFrom,
@@ -67,10 +47,8 @@ export async function fetchOcdsReleases(sinceDate?: string): Promise<unknown[]> 
     PageSize: String(PAGE_SIZE),
   })}`;
 
-  for (let page = 0; page < MAX_PAGES && url; page++) {
-    const res = await fetch(url, {
-      headers: { Accept: "application/json" },
-    });
+  for (let page = 0; page < MAX_PAGES_PER_WINDOW && url; page++) {
+    const res = await fetch(url, { headers: { Accept: "application/json" } });
 
     if (!res.ok) {
       throw new Error(`OCDS API request failed: ${res.status} ${res.statusText}`);
@@ -91,6 +69,46 @@ export async function fetchOcdsReleases(sinceDate?: string): Promise<unknown[]> 
   }
 
   return releases;
+}
+
+export interface NormalizedTender {
+  source: string;
+  external_id: string;
+  title: string;
+  description: string | null;
+  buyer_name: string | null;
+  category: string | null;
+  province: string | null;
+  value_estimate: number | null;
+  currency: string;
+  status: string | null;
+  closing_date: string | null;
+  briefing_date: string | null;
+  published_date: string | null;
+  document_urls: string[];
+  raw_payload: unknown;
+}
+
+/**
+ * Fetches OCDS releases published in [dateFrom, dateTo] (inclusive, YYYY-MM-DD),
+ * walking the range in small date windows so pagination stays fast and no
+ * window is large enough to be truncated by the per-window page cap. Duplicate
+ * releases across window edges are harmless — the caller upserts by ocid.
+ */
+export async function fetchOcdsReleases(dateFrom: string, dateTo: string): Promise<unknown[]> {
+  const all: unknown[] = [];
+  let windowStart = dateFrom;
+
+  while (windowStart <= dateTo) {
+    let windowEnd = addDays(windowStart, WINDOW_DAYS - 1);
+    if (windowEnd > dateTo) windowEnd = dateTo;
+
+    all.push(...(await fetchWindow(windowStart, windowEnd)));
+
+    windowStart = addDays(windowEnd, 1);
+  }
+
+  return all;
 }
 
 // The API serializes an absent .NET DateTime as "0001-01-01T00:00:00" instead
