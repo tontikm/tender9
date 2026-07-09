@@ -79,6 +79,23 @@ create table if not exists company_profiles (
   updated_at timestamptz default now()
 );
 
+-- Bid workspace: per-user, per-tender bid-preparation state — the checklist
+-- of SBD forms/documents/tasks the user has ticked off, plus free-text notes.
+-- One row per (user, tender). The checklist item *definitions* live in code
+-- (lib/bid-workspace.ts); only the ticked state + custom tasks are stored here.
+create table if not exists bid_workspaces (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  tender_id uuid not null references tenders(id) on delete cascade,
+  checklist jsonb not null default '{}'::jsonb,
+  notes text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  unique (user_id, tender_id)
+);
+
+create index if not exists idx_bid_workspaces_user_id on bid_workspaces (user_id);
+
 -- Matches: which tenders matched which profile
 create table if not exists tender_matches (
   id uuid primary key default gen_random_uuid(),
@@ -124,6 +141,7 @@ create table if not exists ingestion_runs (
 alter table tenders enable row level security;
 alter table matching_profiles enable row level security;
 alter table company_profiles enable row level security;
+alter table bid_workspaces enable row level security;
 alter table tender_matches enable row level security;
 alter table tender_drafts enable row level security;
 alter table ingestion_runs enable row level security;
@@ -155,6 +173,14 @@ create policy "Users manage their own matching profiles"
 drop policy if exists "Users manage their own company profile" on company_profiles;
 create policy "Users manage their own company profile"
   on company_profiles for all
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- bid_workspaces: an account only ever sees/manages its own bid workspaces.
+drop policy if exists "Users manage their own bid workspaces" on bid_workspaces;
+create policy "Users manage their own bid workspaces"
+  on bid_workspaces for all
   to authenticated
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
