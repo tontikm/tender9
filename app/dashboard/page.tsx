@@ -26,7 +26,6 @@ interface TenderRow {
   value_estimate: number | null;
   currency: string | null;
   closing_date: string | null;
-  document_urls: string[] | null;
 }
 
 interface MatchRow {
@@ -188,27 +187,36 @@ export default async function DashboardPage({
     return !!closingDate && closingDate < nowIso;
   };
 
-  let query = supabase
+  // Fetch the user's matches once, selecting only the columns the dashboard
+  // renders — NOT tenders(*), which would drag in the large raw_payload JSON
+  // for every row. All filtering/sorting/paging/counting is then done in app
+  // code (match counts per user are in the dozens).
+  const { data: allMatches, error } = await supabase
     .from("tender_matches")
-    .select("id, match_score, status, viewed_at, tenders!inner(*), matching_profiles!inner(name, user_id)")
+    .select(
+      "id, match_score, status, viewed_at, tenders!inner(id, title, buyer_name, category, province, value_estimate, currency, closing_date), matching_profiles!inner(name, user_id)"
+    )
     .eq("matching_profiles.user_id", userId)
-    .order("match_score", { ascending: false });
+    .order("match_score", { ascending: false })
+    .returns<MatchRow[]>();
 
-  if (statusFilter === "all") {
-    query = query.neq("status", "dismissed");
-  } else {
-    query = query.eq("status", statusFilter);
-  }
+  const all = allMatches ?? [];
 
-  const { data: allMatches, error } = await query.returns<MatchRow[]>();
-  const visibleMatches = (allMatches ?? []).filter(
-    (match) => !isExpiredAndUnreviewed(match.status, match.tenders?.closing_date)
-  );
+  // Stats-bar counts: every non-expired match grouped by status.
+  const statusCounts = all
+    .filter((match) => !isExpiredAndUnreviewed(match.status, match.tenders?.closing_date))
+    .reduce<Record<string, number>>((acc, match) => {
+      acc[match.status] = (acc[match.status] ?? 0) + 1;
+      return acc;
+    }, {});
+
+  // Visible list: apply the status tab + the closing-date expiry rule.
+  const visibleMatches = all.filter((match) => {
+    if (isExpiredAndUnreviewed(match.status, match.tenders?.closing_date)) return false;
+    return statusFilter === "all" ? match.status !== "dismissed" : match.status === statusFilter;
+  });
 
   if (sortOption === "closing") {
-    // Base query is already ordered by match_score; re-sort in application
-    // code rather than pushing this through PostgREST, consistent with the
-    // closing-date filtering above.
     visibleMatches.sort((a, b) => {
       const aDate = a.tenders?.closing_date;
       const bDate = b.tenders?.closing_date;
@@ -221,18 +229,6 @@ export default async function DashboardPage({
 
   const totalPages = Math.max(1, Math.ceil(visibleMatches.length / PAGE_SIZE));
   const matches = visibleMatches.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  const { data: allStatuses } = await supabase
-    .from("tender_matches")
-    .select("status, tenders!inner(closing_date), matching_profiles!inner(user_id)")
-    .eq("matching_profiles.user_id", userId)
-    .returns<{ status: string; tenders: { closing_date: string | null } }[]>();
-  const statusCounts = (allStatuses ?? [])
-    .filter((row) => !isExpiredAndUnreviewed(row.status, row.tenders?.closing_date))
-    .reduce<Record<string, number>>((acc, row) => {
-      acc[row.status] = (acc[row.status] ?? 0) + 1;
-      return acc;
-    }, {});
 
   return (
     <main>
