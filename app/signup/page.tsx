@@ -1,4 +1,6 @@
 import { signUp } from "./actions";
+import { signInWithGoogle } from "../login/actions";
+import { GoogleButton } from "../components/GoogleButton";
 
 export default async function SignupPage({
   searchParams,
@@ -14,6 +16,14 @@ export default async function SignupPage({
         <p className="subtitle">Start monitoring SA government tenders</p>
 
         {params.error && <p className="auth-error">{params.error}</p>}
+
+        <form action={signInWithGoogle}>
+          <GoogleButton>Sign up with Google</GoogleButton>
+        </form>
+
+        <div className="auth-divider">
+          <span>or</span>
+        </div>
 
         <form action={signUp} className="auth-form">
           <div className="form-field">

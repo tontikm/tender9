@@ -6,8 +6,9 @@ import { NextResponse, type NextRequest } from "next/server";
 const AUTH_ONLY_PATHS = ["/login", "/signup"];
 
 // Always viewable regardless of auth state — signed-in users are NOT
-// redirected away from these (unlike AUTH_ONLY_PATHS and "/").
-const ALWAYS_PUBLIC_PATHS = ["/privacy"];
+// redirected away from these (unlike AUTH_ONLY_PATHS and "/"). "/auth" is the
+// OAuth callback: it must run to exchange the code, not get bounced to login.
+const ALWAYS_PUBLIC_PATHS = ["/privacy", "/auth"];
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });

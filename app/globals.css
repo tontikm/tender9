@@ -738,6 +738,48 @@ button:hover,
   margin-bottom: 4px;
 }
 
+.oauth-button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 16px;
+  margin-top: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  color: var(--color-text);
+}
+
+.oauth-button:hover {
+  background: var(--color-neutral-bg);
+}
+
+.oauth-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 18px 0 0;
+  color: var(--color-text-faint);
+  font-size: 12px;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+}
+
 .auth-form {
   display: flex;
   flex-direction: column;
