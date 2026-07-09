@@ -71,9 +71,16 @@ function ProfileEditor({
           </div>
 
           <div className="form-field full">
-            <label>Keywords (one per line)</label>
-            <textarea name="keywords" rows={4} defaultValue={profile?.keywords?.join("\n") ?? ""} />
-            <span className="hint">Matched against tender title (2 pts) and description (1 pt).</span>
+            <label>Keywords</label>
+            <textarea
+              name="keywords"
+              rows={4}
+              placeholder="e.g. ict, computers, hardware"
+              defaultValue={profile?.keywords?.join("\n") ?? ""}
+            />
+            <span className="hint">
+              One per line or comma-separated. Matched against tender title (2 pts) and description (1 pt).
+            </span>
           </div>
 
           <div className="form-field full">

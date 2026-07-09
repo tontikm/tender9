@@ -123,6 +123,37 @@ export async function matchTenders(tenderIds: string[]): Promise<number> {
     }
   }
 
+  // Prune stale matches: within the tenders we just re-scored, delete any
+  // 'new' match for an *active* profile that no longer qualifies (score 0),
+  // so narrowing/editing a profile drops old matches instead of leaving them
+  // behind. saved/applied/dismissed are kept — the user has already engaged
+  // with those. Matches for inactive profiles are left untouched.
+  const activeProfileIds = new Set((profiles as MatchingProfile[]).map((p) => p.id));
+  const shouldExist = new Set(matchesToInsert.map((m) => `${m.tender_id}:${m.profile_id}`));
+
+  for (const idChunk of chunk(tenderIds, CHUNK_SIZE)) {
+    const { data: existing, error: existingError } = await supabase
+      .from("tender_matches")
+      .select("id, tender_id, profile_id")
+      .in("tender_id", idChunk)
+      .eq("status", "new");
+
+    if (existingError) throw existingError;
+
+    const staleIds = (existing ?? [])
+      .filter(
+        (m) =>
+          activeProfileIds.has(m.profile_id) &&
+          !shouldExist.has(`${m.tender_id}:${m.profile_id}`)
+      )
+      .map((m) => m.id);
+
+    for (const delChunk of chunk(staleIds, CHUNK_SIZE)) {
+      const { error: delError } = await supabase.from("tender_matches").delete().in("id", delChunk);
+      if (delError) throw delError;
+    }
+  }
+
   if (matchesToInsert.length === 0) return 0;
 
   for (const matchChunk of chunk(matchesToInsert, CHUNK_SIZE)) {
