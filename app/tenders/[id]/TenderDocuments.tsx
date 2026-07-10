@@ -22,6 +22,14 @@ export function TenderDocuments({
               <span className="document-name">{doc.name}</span>
               <span className="document-actions">
                 {doc.isPdf && (
+                  <a
+                    href={`/fill?tender=${tenderId}&doc=${doc.index}`}
+                    className="document-preview-btn"
+                  >
+                    Fill
+                  </a>
+                )}
+                {doc.isPdf && (
                   <button
                     type="button"
                     className="document-preview-btn"
