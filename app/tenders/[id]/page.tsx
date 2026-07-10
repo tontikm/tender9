@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { getSupabaseAuthClient, getCurrentUser } from "@/lib/supabase-auth";
-import { updateMatchStatus } from "../../actions";
-import { IconBuilding, IconTag, IconMapPin, IconCoin } from "../../components/icons";
+import { updateMatchStatus, dismissMatchAndReturn } from "../../actions";
+import { IconBuilding, IconTag, IconMapPin, IconCalendar } from "../../components/icons";
 import { formatDate, formatDateTime, formatValue } from "@/lib/format";
 import { extractRequirements } from "@/lib/requirements";
 import { describeDocuments } from "@/lib/tender-docs";
@@ -107,10 +107,9 @@ export default async function TenderDetailPage({
           <IconMapPin className="meta-icon" />
           {tender.province ?? "National"}
         </span>
-        <span className="meta-item">
-          <IconCoin className="meta-icon" />
-          {formatValue(tender.value_estimate, tender.currency)}
-        </span>
+        {tender.value_estimate != null && tender.value_estimate > 0 && (
+          <span className="meta-item">{formatValue(tender.value_estimate, tender.currency)}</span>
+        )}
       </div>
 
       <div className="detail-grid">
@@ -131,6 +130,19 @@ export default async function TenderDetailPage({
           <span>{formatDateTime(tender.closing_date)}</span>
         </div>
       </div>
+
+      {tender.briefing_date && (
+        <div className={`briefing-reminder ${requirements.briefing?.compulsory ? "compulsory" : ""}`}>
+          <IconCalendar className="meta-icon" />
+          <span>
+            Briefing session {formatDateTime(tender.briefing_date)}
+            {requirements.briefing?.compulsory ? " — compulsory" : ""}
+          </span>
+          <a href={`/tenders/${tender.id}/calendar`} className="briefing-calendar-link">
+            Add reminder to calendar
+          </a>
+        </div>
+      )}
 
       {tender.description && (
         <>
@@ -253,7 +265,10 @@ export default async function TenderDetailPage({
                       <button type="submit">Mark applied</button>
                     </form>
                   )}
-                  <form action={updateMatchStatus.bind(null, match.id, "dismissed")} className="dismiss-button">
+                  <form
+                    action={dismissMatchAndReturn.bind(null, match.id)}
+                    className="dismiss-button"
+                  >
                     <button type="submit">Dismiss</button>
                   </form>
                 </div>

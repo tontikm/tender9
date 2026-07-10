@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { getSupabaseAuthClient, getCurrentUser } from "@/lib/supabase-auth";
 import { generateDraftForTender } from "@/lib/draft";
 
@@ -36,6 +37,13 @@ export async function updateMatchStatus(matchId: string, status: string) {
   if (error) throw error;
 
   revalidatePath("/dashboard");
+}
+
+// Used by the tender detail page's Dismiss button so that, once dismissed, the
+// user is returned to the dashboard (the tender is no longer in their view).
+export async function dismissMatchAndReturn(matchId: string) {
+  await updateMatchStatus(matchId, "dismissed");
+  redirect("/dashboard");
 }
 
 export async function generateDraft(tenderId: string) {

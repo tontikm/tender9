@@ -1,5 +1,5 @@
 import { getSupabaseAuthClient } from "@/lib/supabase-auth";
-import { IconBuilding, IconTag, IconMapPin, IconCalendar, IconCoin } from "../components/icons";
+import { IconBuilding, IconTag, IconMapPin, IconCalendar } from "../components/icons";
 import { formatDate, formatValue } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -169,10 +169,9 @@ export default async function BrowsePage({
                   <IconMapPin className="meta-icon" />
                   {tender.province ?? "National"}
                 </span>
-                <span className="meta-item">
-                  <IconCoin className="meta-icon" />
-                  {formatValue(tender.value_estimate, tender.currency)}
-                </span>
+                {tender.value_estimate != null && tender.value_estimate > 0 && (
+                  <span className="meta-item">{formatValue(tender.value_estimate, tender.currency)}</span>
+                )}
                 <span className="meta-item">
                   <IconCalendar className="meta-icon" />
                   Closes {formatDate(tender.closing_date)}
