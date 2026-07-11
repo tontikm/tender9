@@ -86,8 +86,8 @@ export default async function TenderDetailPage({
           <a href={`/tenders/${tender.id}/workspace`} className="page-nav-cta secondary">
             Bid workspace
           </a>
-          <a href={`/tenders/${tender.id}/bid-pack`} className="page-nav-cta">
-            Prepare SBD forms
+          <a href={`/fill?tender=${tender.id}`} className="page-nav-cta">
+            Fill documents
           </a>
         </span>
       </nav>
