@@ -18,7 +18,7 @@ export default async function CompanyPage() {
       <h1>Company profile</h1>
       <p className="subtitle">
         Your business details, used to pre-fill bid paperwork (SBD forms and similar). This is
-        separate from your matching profiles — it describes who you are, not which tenders you want.
+        separate from your matching profiles: it describes who you are, not which tenders you want.
       </p>
 
       {error && <p className="empty-state">Failed to load company profile: {error.message}</p>}

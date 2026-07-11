@@ -18,11 +18,11 @@ export const STANDARD_CHECKLIST: ChecklistGroup[] = [
   {
     heading: "SBD forms",
     items: [
-      { id: "sbd-1", label: "SBD 1 — Invitation to Bid / bidder's particulars" },
-      { id: "sbd-4", label: "SBD 4 — Declaration of Interest" },
-      { id: "sbd-6.1", label: "SBD 6.1 — Preference Points Claim" },
-      { id: "sbd-8", label: "SBD 8 — Declaration of past SCM practices" },
-      { id: "sbd-9", label: "SBD 9 — Certificate of Independent Bid Determination" },
+      { id: "sbd-1", label: "SBD 1: Invitation to Bid / bidder's particulars" },
+      { id: "sbd-4", label: "SBD 4: Declaration of Interest" },
+      { id: "sbd-6.1", label: "SBD 6.1: Preference Points Claim" },
+      { id: "sbd-8", label: "SBD 8: Declaration of past SCM practices" },
+      { id: "sbd-9", label: "SBD 9: Certificate of Independent Bid Determination" },
     ],
   },
   {
@@ -89,4 +89,23 @@ export function checklistProgress(checklist: WorkspaceChecklist): {
     done: standardDone + checklist.custom.filter((t) => t.done).length,
     total: standardTotal + checklist.custom.length,
   };
+}
+
+export interface ClosingInfo {
+  label: string;
+  urgent: boolean;
+  days: number;
+}
+
+// Days until closing, computed server-side to avoid a hydration mismatch.
+// `days` is exposed so callers can sort by urgency, not just display a label.
+export function closingInfo(closingDate: string | null | undefined): ClosingInfo | null {
+  if (!closingDate) return null;
+  const closing = new Date(closingDate);
+  const now = new Date();
+  const days = Math.ceil((closing.getTime() - now.getTime()) / 86_400_000);
+  if (days < 0) return { label: "Closed", urgent: true, days };
+  if (days === 0) return { label: "Closes today", urgent: true, days };
+  if (days === 1) return { label: "Closes tomorrow", urgent: true, days };
+  return { label: `Closes in ${days} days`, urgent: days <= 7, days };
 }

@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getSupabaseAuthClient, getCurrentUser } from "@/lib/supabase-auth";
-import { normaliseChecklist } from "@/lib/bid-workspace";
+import { normaliseChecklist, closingInfo } from "@/lib/bid-workspace";
 import { formatDate } from "@/lib/format";
 import { BidWorkspace } from "./BidWorkspace";
 
@@ -16,18 +16,6 @@ interface TenderRow {
 interface WorkspaceRow {
   checklist: unknown;
   notes: string | null;
-}
-
-// Days until closing, computed server-side to avoid a hydration mismatch.
-function closingInfo(closingDate: string | null): { label: string; urgent: boolean } | null {
-  if (!closingDate) return null;
-  const closing = new Date(closingDate);
-  const now = new Date();
-  const days = Math.ceil((closing.getTime() - now.getTime()) / 86_400_000);
-  if (days < 0) return { label: "Closed", urgent: true };
-  if (days === 0) return { label: "Closes today", urgent: true };
-  if (days === 1) return { label: "Closes tomorrow", urgent: true };
-  return { label: `Closes in ${days} days`, urgent: days <= 7 };
 }
 
 export default async function WorkspacePage({ params }: { params: Promise<{ id: string }> }) {

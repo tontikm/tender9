@@ -688,7 +688,7 @@ export function PdfFiller({
       <div className={`fill-pages ${armed || drawMode ? "armed" : ""}`} ref={columnRef}>
         {status === "idle" && (
           <p className="fill-status">
-            Open a PDF to get started — a tender document, or any form saved on your computer.
+            Open a PDF to get started: a tender document, or any form saved on your computer.
           </p>
         )}
         {status === "loading" && <p className="fill-status">Loading document…</p>}
@@ -963,14 +963,14 @@ export function PdfFiller({
           </button>
         </div>
 
-        <h3 className="fill-heading">Pen — circle or underline</h3>
+        <h3 className="fill-heading">Pen: circle or underline</h3>
         <div className="fill-pen">
           <button
             type="button"
             className={`fill-pen-toggle ${drawMode ? "on" : ""}`}
             onClick={() => setDrawMode((d) => !d)}
           >
-            {drawMode ? "Drawing — click to stop" : "Draw on the document"}
+            {drawMode ? "Drawing… click to stop" : "Draw on the document"}
           </button>
           <div className="fill-pen-colors">
             {PEN_COLORS.map((c) => (
@@ -1111,7 +1111,7 @@ export function PdfFiller({
             </button>
           )}
           <p className="hint">
-            The original document is untouched — your marks go on top. <strong>Save to workspace</strong>{" "}
+            The original document is untouched, your marks go on top. <strong>Save to workspace</strong>{" "}
             to come back and finish later on any device.
           </p>
         </div>

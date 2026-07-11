@@ -45,7 +45,7 @@ function meaningfulText(value: unknown): string | null {
 }
 
 const BASE_DOCUMENTS = [
-  "Central Supplier Database (CSD) registration — your supplier (MAAA) number",
+  "Central Supplier Database (CSD) registration, including your supplier (MAAA) number",
   "Valid Tax Compliance Status (TCS) PIN from SARS",
   "B-BBEE certificate or sworn affidavit (used to claim preference points)",
   "Certified copies of directors' IDs and your CIPC company registration",

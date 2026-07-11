@@ -11,7 +11,7 @@ export default async function LoginPage({
     <main className="auth-main">
       <div className="auth-card">
         <h1>Sign in</h1>
-        <p className="subtitle">Tender9 — SA tender monitoring</p>
+        <p className="subtitle">Tender9: SA tender monitoring</p>
 
         {params.message && <p className="auth-notice">{params.message}</p>}
         {params.error && <p className="auth-error">{params.error}</p>}

@@ -134,6 +134,15 @@ a {
   color: var(--color-text);
 }
 
+.site-nav-primary {
+  color: var(--color-primary) !important;
+  font-weight: 700 !important;
+}
+
+.site-nav-primary:hover {
+  background: var(--color-primary-bg) !important;
+}
+
 .signout-button {
   padding: 7px 12px;
   border-radius: var(--radius-sm);
@@ -574,7 +583,8 @@ h1 {
   color: var(--color-text-muted);
 }
 
-.badge.viewed {
+.badge.viewed,
+.badge.neutral {
   background: var(--color-surface);
   color: var(--color-text-muted);
   border: 1px solid var(--color-border);
@@ -693,6 +703,8 @@ button,
   background: var(--color-surface);
   color: var(--color-text);
   cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
   transition: background-color 0.12s ease, border-color 0.12s ease;
 }
 
@@ -1770,6 +1782,186 @@ button:hover,
   outline: none;
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px var(--color-primary-bg);
+}
+
+/* ---------- My workspace (hub) ---------- */
+
+.hub-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 20px 22px;
+  margin-bottom: 16px;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.hub-card:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-border-strong);
+}
+
+.hub-card.closed {
+  background: var(--color-neutral-bg);
+  box-shadow: none;
+}
+
+.hub-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.hub-card-title {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+
+.hub-card-title a {
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.hub-card-title a:hover {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
+.hub-card-progress {
+  margin-bottom: 14px;
+}
+
+.hub-progress-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  margin-bottom: 6px;
+}
+
+.workspace-progress-bar.compact {
+  height: 6px;
+}
+
+.hub-card-hint {
+  font-size: 13px;
+  color: var(--color-text-faint);
+  font-style: italic;
+  margin: 0 0 14px;
+}
+
+.hub-card-docs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--color-neutral-bg);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+
+.hub-card-docs-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.hub-doc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hub-doc-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.hub-doc-list a {
+  color: var(--color-primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.hub-doc-list a:hover {
+  text-decoration: underline;
+}
+
+.hub-doc-meta {
+  color: var(--color-text-faint);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.hub-card-note {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  background: var(--color-neutral-bg);
+  border-left: 3px solid var(--color-border-strong);
+  padding: 8px 12px;
+  margin: 0 0 14px;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.hub-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.hub-view-link {
+  margin-left: auto;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.hub-view-link:hover {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
+.hub-empty {
+  text-align: center;
+  padding: 60px 24px;
+  background: var(--color-surface);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+}
+
+.hub-empty-icon {
+  width: 32px;
+  height: 32px;
+  color: var(--color-text-faint);
+  margin-bottom: 12px;
+}
+
+.hub-empty h3 {
+  margin: 0 0 8px;
+  font-size: 17px;
+}
+
+.hub-empty p {
+  max-width: 420px;
+  margin: 0 auto 20px;
+  color: var(--color-text-muted);
+  font-size: 14px;
 }
 
 /* ---------- PDF filler ---------- */

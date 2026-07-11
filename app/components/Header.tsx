@@ -13,6 +13,9 @@ export async function Header() {
         </a>
         {user && (
           <nav className="site-nav">
+            <a href="/workspace" className="site-nav-primary">
+              My Workspace
+            </a>
             <a href="/dashboard">Tenders</a>
             <a href="/browse">Browse</a>
             <a href="/fill">Fill PDF</a>

@@ -27,11 +27,11 @@ export default function PrivacyPolicyPage() {
       <ul>
         <li>Your email address and password (your password is hashed and never stored in plain text).</li>
         <li>
-          The business/matching profile information you enter — company name, keywords,
+          The business/matching profile information you enter: company name, keywords,
           categories, provinces, and value ranges used to match you against government tenders.
         </li>
         <li>
-          Your usage of the service — which tenders you save, dismiss, or mark as applied — so we
+          Your usage of the service (which tenders you save, dismiss, or mark as applied), so we
           can show you your own pipeline.
         </li>
       </ul>
@@ -62,16 +62,16 @@ export default function PrivacyPolicyPage() {
       </p>
       <ul>
         <li>
-          <strong>Supabase</strong> — our database and authentication provider. Your account data
+          <strong>Supabase</strong>: our database and authentication provider. Your account data
           and matching profiles are stored in Supabase&apos;s infrastructure.
         </li>
         <li>
-          <strong>Vercel</strong> — our application hosting provider.
+          <strong>Vercel</strong>: our application hosting provider.
         </li>
       </ul>
       <p>
         Tender data itself (tender titles, descriptions, buyer names, closing dates, etc.) comes
-        from National Treasury&apos;s public eTenders OCDS feed — this is public government
+        from National Treasury&apos;s public eTenders OCDS feed. This is public government
         information, not personal information about you.
       </p>
 

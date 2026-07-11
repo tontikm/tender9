@@ -121,7 +121,7 @@ export default async function FillPage({
       <p className="subtitle">
         {tenderTitle
           ? `Filling documents from ${tenderTitle}. `
-          : "Open any PDF — a tender's official forms or your own — and place your saved details exactly where they belong. "}
+          : "Open any PDF, a tender's official forms or your own, and place your saved details exactly where they belong. "}
         Click a detail, then click the spot on the document. Works on scanned documents too.
       </p>
 

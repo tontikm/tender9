@@ -55,7 +55,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const end = toIcsUtc(new Date(startMs + 60 * 60 * 1000).toISOString());
 
   const descriptionParts = [
-    compulsory ? "COMPULSORY briefing — attendance is mandatory." : "Briefing session.",
+    compulsory ? "COMPULSORY briefing. Attendance is mandatory." : "Briefing session.",
     tender.buyer_name ? `Buyer: ${tender.buyer_name}.` : "",
     "Reminder added from Tender9.",
   ].filter(Boolean);
