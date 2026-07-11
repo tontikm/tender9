@@ -96,6 +96,26 @@ create table if not exists bid_workspaces (
 
 create index if not exists idx_bid_workspaces_user_id on bid_workspaces (user_id);
 
+-- In-progress document fills: lets a user save an unfinished filled document
+-- and resume it later on any device (instead of downloading + re-uploading).
+-- `placements` is the fill tool's overlay (text/signature/marks/pen). For
+-- tender documents the PDF is re-fetched from the tender, so only uploads
+-- store their bytes (base64) in pdf_base64. One row per (user, doc_key).
+create table if not exists document_fills (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  tender_id uuid references tenders(id) on delete set null,
+  doc_key text not null,
+  doc_name text not null,
+  placements jsonb not null default '[]'::jsonb,
+  pdf_base64 text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  unique (user_id, doc_key)
+);
+
+create index if not exists idx_document_fills_user_id on document_fills (user_id);
+
 -- Matches: which tenders matched which profile
 create table if not exists tender_matches (
   id uuid primary key default gen_random_uuid(),
@@ -142,6 +162,7 @@ alter table tenders enable row level security;
 alter table matching_profiles enable row level security;
 alter table company_profiles enable row level security;
 alter table bid_workspaces enable row level security;
+alter table document_fills enable row level security;
 alter table tender_matches enable row level security;
 alter table tender_drafts enable row level security;
 alter table ingestion_runs enable row level security;
@@ -181,6 +202,14 @@ create policy "Users manage their own company profile"
 drop policy if exists "Users manage their own bid workspaces" on bid_workspaces;
 create policy "Users manage their own bid workspaces"
   on bid_workspaces for all
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- document_fills: an account only ever sees/manages its own saved fills.
+drop policy if exists "Users manage their own document fills" on document_fills;
+create policy "Users manage their own document fills"
+  on document_fills for all
   to authenticated
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);

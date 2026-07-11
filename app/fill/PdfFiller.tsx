@@ -9,6 +9,29 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { SignaturePad } from "./SignaturePad";
+import { saveFill, loadFill } from "./actions";
+
+export interface SavedFill {
+  docKey: string;
+  docName: string;
+  updatedOn: string;
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let bin = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(bin);
+}
+
+function base64ToBytes(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
 
 export interface FillChip {
   label: string;
@@ -125,10 +148,12 @@ export function PdfFiller({
   chips,
   tenderDocs = [],
   initialKey,
+  savedFills = [],
 }: {
   chips: FillChip[];
   tenderDocs?: { name: string; url: string; key: string }[];
   initialKey?: string;
+  savedFills?: SavedFill[];
 }) {
   const firstKey = initialKey ?? tenderDocs[0]?.key ?? "";
   const [bytes, setBytes] = useState<Uint8Array | null>(null);
@@ -145,6 +170,8 @@ export function PdfFiller({
   const [penColor, setPenColor] = useState(PEN_COLORS[0]);
   const [draftPage, setDraftPage] = useState<number | null>(null);
   const [draftPoints, setDraftPoints] = useState<InkPoint[]>([]);
+  const [fills, setFills] = useState<SavedFill[]>(savedFills);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">(
     firstKey ? "loading" : "idle"
   );
@@ -248,16 +275,38 @@ export function PdfFiller({
     };
   }, [pages, docKey]);
 
-  // Placements persist per document on this device.
+  // Restore this document's placements: prefer the copy saved to the
+  // workspace (server, cross-device), fall back to the local auto-cache.
   useEffect(() => {
     if (!docKey) return;
-    try {
-      const raw = localStorage.getItem(`t9-fill:${docKey}`);
-      setPlacements(raw ? (JSON.parse(raw) as Placement[]) : []);
-    } catch {
-      setPlacements([]);
-    }
-    loadedKeyRef.current = docKey;
+    loadedKeyRef.current = null; // pause the local auto-save until this loads
+    let cancelled = false;
+    (async () => {
+      let next: Placement[] = [];
+      try {
+        const saved = await loadFill(docKey);
+        if (saved && Array.isArray(saved.placements)) {
+          next = saved.placements as Placement[];
+        } else {
+          const raw = localStorage.getItem(`t9-fill:${docKey}`);
+          next = raw ? (JSON.parse(raw) as Placement[]) : [];
+        }
+      } catch {
+        try {
+          const raw = localStorage.getItem(`t9-fill:${docKey}`);
+          next = raw ? (JSON.parse(raw) as Placement[]) : [];
+        } catch {
+          next = [];
+        }
+      }
+      if (cancelled) return;
+      setPlacements(next);
+      setSelectedId(null);
+      loadedKeyRef.current = docKey;
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [docKey]);
 
   useEffect(() => {
@@ -306,6 +355,55 @@ export function PdfFiller({
       localStorage.setItem("t9-signature", JSON.stringify({ dataUrl, aspect }));
     } catch {
       // storage full/blocked — still usable this session
+    }
+  };
+
+  const saveToWorkspace = async () => {
+    if (!bytes || !docKey) return;
+    setSaveState("saving");
+    const isUpload = docKey.startsWith("upload:");
+    const tenderId = docKey.startsWith("tender:") ? docKey.split(":")[1] ?? null : null;
+    const res = await saveFill({
+      docKey,
+      docName: docName || "document.pdf",
+      tenderId,
+      placements,
+      pdfBase64: isUpload ? bytesToBase64(bytes) : null,
+    });
+    if (res.ok) {
+      setSaveState("saved");
+      setFills((prev) => {
+        const rest = prev.filter((f) => f.docKey !== docKey);
+        return [{ docKey, docName: docName || "document.pdf", updatedOn: "just now" }, ...rest];
+      });
+      setTimeout(() => setSaveState("idle"), 2500);
+    } else {
+      setSaveState("error");
+      setError(res.error);
+    }
+  };
+
+  const resumeFill = async (key: string) => {
+    setStatus("loading");
+    setError(null);
+    try {
+      const saved = await loadFill(key);
+      if (!saved) throw new Error("this saved document could not be found");
+      if (saved.pdfBase64) {
+        await openBytes(base64ToBytes(saved.pdfBase64), saved.docName, key);
+      } else if (key.startsWith("tender:")) {
+        const [, tid, idx] = key.split(":");
+        const res = await fetch(`/tenders/${tid}/document?i=${idx}`);
+        if (!res.ok) throw new Error(`the server returned ${res.status}`);
+        await openBytes(new Uint8Array(await res.arrayBuffer()), saved.docName, key);
+      } else {
+        throw new Error("the original file is not available — re-open it to continue");
+      }
+      // openBytes set docKey -> the restore effect applies the saved placements.
+      setCurrentKey(key);
+    } catch (e) {
+      setStatus("error");
+      setError(`Could not resume: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
 
@@ -717,6 +815,25 @@ export function PdfFiller({
       </div>
 
       <aside className="fill-sidebar">
+        {fills.length > 0 && (
+          <div className="fill-resume">
+            <label>Continue where you left off</label>
+            {fills.slice(0, 5).map((f) => (
+              <button
+                key={f.docKey}
+                type="button"
+                className={`fill-resume-item ${f.docKey === docKey ? "current" : ""}`}
+                onClick={() => resumeFill(f.docKey)}
+                disabled={f.docKey === docKey}
+                title={f.docName}
+              >
+                <span className="fill-resume-name">{f.docName}</span>
+                <span className="fill-resume-date">{f.docKey === docKey ? "open" : f.updatedOn}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         {tenderDocs.length > 0 && (
           <div className="fill-docpicker">
             <label htmlFor="fill-doc-select">Tender document</label>
@@ -942,6 +1059,18 @@ export function PdfFiller({
         <div className="fill-actions">
           <button
             type="button"
+            className="fill-save-workspace"
+            disabled={!bytes || saveState === "saving"}
+            onClick={saveToWorkspace}
+          >
+            {saveState === "saving"
+              ? "Saving…"
+              : saveState === "saved"
+                ? "Saved to workspace ✓"
+                : "Save to workspace"}
+          </button>
+          <button
+            type="button"
             className="fill-download"
             disabled={!bytes || placements.length === 0 || downloading}
             onClick={download}
@@ -961,8 +1090,8 @@ export function PdfFiller({
             </button>
           )}
           <p className="hint">
-            The original document is untouched — your text is written on top. Placements save
-            automatically on this device.
+            The original document is untouched — your marks go on top. <strong>Save to workspace</strong>{" "}
+            to come back and finish later on any device.
           </p>
         </div>
 
