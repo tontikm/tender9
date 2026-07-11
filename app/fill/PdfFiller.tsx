@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
+import { SignaturePad } from "./SignaturePad";
 
 export interface FillChip {
   label: string;
@@ -19,8 +20,26 @@ interface Placement {
   page: number; // 0-based
   xPct: number; // fraction of page width (top-left anchor)
   yPct: number; // fraction of page height
-  text: string;
-  size: number; // font size in PDF points
+  kind: "text" | "image";
+  text?: string; // text placements
+  dataUrl?: string; // image (signature) placements
+  aspect?: number; // image width / height
+  size: number; // text: font size (pt); image: height (pt)
+}
+
+// What's currently "armed" to be placed on the next page click.
+type Armed = { kind: "text"; text: string } | { kind: "image"; dataUrl: string; aspect: number } | null;
+
+interface SavedSig {
+  dataUrl: string;
+  aspect: number;
+}
+
+function dataUrlToBytes(dataUrl: string): Uint8Array {
+  const bin = atob(dataUrl.split(",")[1] ?? "");
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
 }
 
 interface PageMeta {
@@ -32,6 +51,9 @@ interface PageMeta {
 const DEFAULT_SIZE = 10;
 const MIN_SIZE = 6;
 const MAX_SIZE = 24;
+const DEFAULT_SIG_HEIGHT = 30; // pt
+const MIN_SIG = 12;
+const MAX_SIG = 90;
 
 // pdf-lib's standard Helvetica uses WinAnsi encoding — map smart punctuation
 // to safe equivalents and replace anything else it can't encode.
@@ -78,9 +100,10 @@ export function PdfFiller({
   const [currentKey, setCurrentKey] = useState(firstKey);
   const [pages, setPages] = useState<PageMeta[]>([]);
   const [placements, setPlacements] = useState<Placement[]>([]);
-  const [armed, setArmed] = useState<string | null>(null);
+  const [armed, setArmed] = useState<Armed>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [customText, setCustomText] = useState("");
+  const [savedSig, setSavedSig] = useState<SavedSig | null>(null);
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">(
     firstKey ? "loading" : "idle"
   );
@@ -219,6 +242,26 @@ export function PdfFiller({
     return () => window.removeEventListener("keydown", onKey);
   }, [selectedId]);
 
+  // Reuse the last-drawn signature across documents/sessions.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("t9-signature");
+      if (raw) setSavedSig(JSON.parse(raw) as SavedSig);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const useSignature = (dataUrl: string, aspect: number) => {
+    setArmed({ kind: "image", dataUrl, aspect });
+    setSavedSig({ dataUrl, aspect });
+    try {
+      localStorage.setItem("t9-signature", JSON.stringify({ dataUrl, aspect }));
+    } catch {
+      // storage full/blocked — still usable this session
+    }
+  };
+
   const onFile = async (file: File | undefined) => {
     if (!file) return;
     if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
@@ -240,17 +283,17 @@ export function PdfFiller({
     if (!wrap) return;
     const rect = wrap.getBoundingClientRect();
     const id = crypto.randomUUID();
-    setPlacements((ps) => [
-      ...ps,
-      {
-        id,
-        page: pageIdx,
-        xPct: clamp01((e.clientX - rect.left) / rect.width),
-        yPct: clamp01((e.clientY - rect.top) / rect.height),
-        text: armed,
-        size: DEFAULT_SIZE,
-      },
-    ]);
+    const base = {
+      id,
+      page: pageIdx,
+      xPct: clamp01((e.clientX - rect.left) / rect.width),
+      yPct: clamp01((e.clientY - rect.top) / rect.height),
+    };
+    const placement: Placement =
+      armed.kind === "text"
+        ? { ...base, kind: "text", text: armed.text, size: DEFAULT_SIZE }
+        : { ...base, kind: "image", dataUrl: armed.dataUrl, aspect: armed.aspect, size: DEFAULT_SIG_HEIGHT };
+    setPlacements((ps) => [...ps, placement]);
     setArmed(null);
     setSelectedId(id);
   };
@@ -285,11 +328,12 @@ export function PdfFiller({
   const resizeSelected = (delta: number) => {
     if (!selectedId) return;
     setPlacements((ps) =>
-      ps.map((p) =>
-        p.id === selectedId
-          ? { ...p, size: Math.min(MAX_SIZE, Math.max(MIN_SIZE, p.size + delta)) }
-          : p
-      )
+      ps.map((p) => {
+        if (p.id !== selectedId) return p;
+        const [min, max] = p.kind === "image" ? [MIN_SIG, MAX_SIG] : [MIN_SIZE, MAX_SIZE];
+        const step = p.kind === "image" ? delta * 3 : delta;
+        return { ...p, size: Math.min(max, Math.max(min, p.size + step)) };
+      })
     );
   };
 
@@ -311,7 +355,22 @@ export function PdfFiller({
         if (p.page >= doc.getPageCount()) continue;
         const page = doc.getPage(p.page);
         const { width, height } = page.getSize();
-        const lines = sanitizeForPdf(p.text).split("\n");
+
+        if (p.kind === "image" && p.dataUrl) {
+          const png = await doc.embedPng(dataUrlToBytes(p.dataUrl));
+          const h = p.size;
+          const w = p.size * (p.aspect ?? 1);
+          page.drawImage(png, {
+            x: p.xPct * width,
+            // top-left anchor -> pdf-lib's bottom-left origin.
+            y: height - p.yPct * height - h,
+            width: w,
+            height: h,
+          });
+          continue;
+        }
+
+        const lines = sanitizeForPdf(p.text ?? "").split("\n");
         lines.forEach((line, li) => {
           page.drawText(line, {
             x: p.xPct * width,
@@ -369,21 +428,42 @@ export function PdfFiller({
             />
             {placements
               .filter((p) => p.page === i)
-              .map((p) => (
-                <span
-                  key={p.id}
-                  className={`fill-item ${selectedId === p.id ? "selected" : ""}`}
-                  style={{
-                    left: `${p.xPct * 100}%`,
-                    top: `${p.yPct * 100}%`,
-                    fontSize: p.size * m.scale,
-                  }}
-                  onPointerDown={(e) => startDrag(e, p)}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {p.text}
-                </span>
-              ))}
+              .map((p) =>
+                p.kind === "image" ? (
+                  <span
+                    key={p.id}
+                    className={`fill-item image ${selectedId === p.id ? "selected" : ""}`}
+                    style={{ left: `${p.xPct * 100}%`, top: `${p.yPct * 100}%` }}
+                    onPointerDown={(e) => startDrag(e, p)}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <img
+                      src={p.dataUrl}
+                      alt="signature"
+                      draggable={false}
+                      style={{
+                        display: "block",
+                        height: p.size * m.scale,
+                        width: p.size * (p.aspect ?? 1) * m.scale,
+                      }}
+                    />
+                  </span>
+                ) : (
+                  <span
+                    key={p.id}
+                    className={`fill-item ${selectedId === p.id ? "selected" : ""}`}
+                    style={{
+                      left: `${p.xPct * 100}%`,
+                      top: `${p.yPct * 100}%`,
+                      fontSize: p.size * m.scale,
+                    }}
+                    onPointerDown={(e) => startDrag(e, p)}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {p.text}
+                  </span>
+                )
+              )}
           </div>
         ))}
       </div>
@@ -427,18 +507,21 @@ export function PdfFiller({
           </p>
         ) : (
           <div className="fill-chips">
-            {chips.map((c) => (
-              <button
-                key={c.label}
-                type="button"
-                className={`fill-chip ${armed === c.value ? "armed" : ""}`}
-                onClick={() => setArmed(armed === c.value ? null : c.value)}
-                title={c.value}
-              >
-                <span className="fill-chip-label">{c.label}</span>
-                <span className="fill-chip-value">{truncate(c.value, 32)}</span>
-              </button>
-            ))}
+            {chips.map((c) => {
+              const isArmed = armed?.kind === "text" && armed.text === c.value;
+              return (
+                <button
+                  key={c.label}
+                  type="button"
+                  className={`fill-chip ${isArmed ? "armed" : ""}`}
+                  onClick={() => setArmed(isArmed ? null : { kind: "text", text: c.value })}
+                  title={c.value}
+                >
+                  <span className="fill-chip-label">{c.label}</span>
+                  <span className="fill-chip-value">{truncate(c.value, 32)}</span>
+                </button>
+              );
+            })}
           </div>
         )}
 
@@ -452,22 +535,42 @@ export function PdfFiller({
             onKeyDown={(e) => {
               if (e.key === "Enter" && customText.trim()) {
                 e.preventDefault();
-                setArmed(customText.trim());
+                setArmed({ kind: "text", text: customText.trim() });
               }
             }}
           />
           <button
             type="button"
             disabled={!customText.trim()}
-            onClick={() => setArmed(customText.trim())}
+            onClick={() => setArmed({ kind: "text", text: customText.trim() })}
           >
             Place
           </button>
         </div>
 
+        <h3 className="fill-heading">Signature or initials</h3>
+        {savedSig && (
+          <button
+            type="button"
+            className={`fill-chip fill-sig-chip ${armed?.kind === "image" ? "armed" : ""}`}
+            onClick={() =>
+              setArmed(
+                armed?.kind === "image"
+                  ? null
+                  : { kind: "image", dataUrl: savedSig.dataUrl, aspect: savedSig.aspect }
+              )
+            }
+          >
+            <span className="fill-chip-label">Place saved signature</span>
+            <img src={savedSig.dataUrl} alt="saved signature" className="fill-sig-thumb" />
+          </button>
+        )}
+        <SignaturePad onUse={useSignature} />
+
         {armed && (
           <p className="fill-armed-note">
-            Click on the document where <strong>“{truncate(armed, 28)}”</strong> should go.{" "}
+            Click on the document to place{" "}
+            <strong>{armed.kind === "text" ? `“${truncate(armed.text, 28)}”` : "your signature"}</strong>.{" "}
             <button type="button" onClick={() => setArmed(null)}>
               Cancel
             </button>
@@ -476,7 +579,9 @@ export function PdfFiller({
 
         {selected && (
           <div className="fill-selected">
-            <h3 className="fill-heading">Selected: “{truncate(selected.text, 24)}”</h3>
+            <h3 className="fill-heading">
+              Selected: {selected.kind === "image" ? "signature" : `“${truncate(selected.text ?? "", 24)}”`}
+            </h3>
             <div className="fill-selected-controls">
               <button type="button" onClick={() => resizeSelected(-1)} aria-label="Smaller text">
                 A−

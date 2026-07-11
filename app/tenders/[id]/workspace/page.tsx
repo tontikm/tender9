@@ -57,8 +57,8 @@ export default async function WorkspacePage({ params }: { params: Promise<{ id: 
     <main>
       <nav className="page-nav">
         <a href={`/tenders/${id}`}>&larr; Back to tender</a>
-        <a href={`/tenders/${id}/bid-pack`} className="page-nav-cta">
-          Open SBD forms
+        <a href={`/fill?tender=${id}`} className="page-nav-cta">
+          Fill documents
         </a>
       </nav>
 
