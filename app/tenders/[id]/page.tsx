@@ -147,7 +147,7 @@ export default async function TenderDetailPage({
           <IconCalendar className="meta-icon" />
           <span>
             Briefing session {formatDateTime(tender.briefing_date)}
-            {requirements.briefing?.compulsory ? " — compulsory" : ""}
+            {requirements.briefing?.compulsory ? " (compulsory)" : ""}
           </span>
           <a href={`/tenders/${tender.id}/calendar`} className="briefing-calendar-link">
             Add reminder to calendar
@@ -198,7 +198,7 @@ export default async function TenderDetailPage({
               </h4>
               <p className="requirements-note">
                 {requirements.briefing.compulsory
-                  ? "Attendance is mandatory — miss it and your bid will be disqualified."
+                  ? "Attendance is mandatory. Miss it and your bid will be disqualified."
                   : "Attendance is optional but recommended."}
                 {requirements.briefing.venue ? ` Venue: ${requirements.briefing.venue}.` : ""}
                 {tender.briefing_date
@@ -227,7 +227,7 @@ export default async function TenderDetailPage({
             <ul className="requirements-list">
               {requirements.sbdForms.map((form) => (
                 <li key={form.code}>
-                  <strong>{form.code}</strong> — {form.title}
+                  <strong>{form.code}</strong>: {form.title}
                 </li>
               ))}
             </ul>
@@ -245,7 +245,7 @@ export default async function TenderDetailPage({
           <p className="requirements-disclaimer">
             The special conditions and briefing details above come straight from the tender
             feed. The document, SBD-form and disqualification lists are general guidance based
-            on standard South African government procurement rules — always confirm the exact
+            on standard South African government procurement rules, so always confirm the exact
             requirements in the official tender document before submitting.
           </p>
         </div>

@@ -119,7 +119,7 @@ function RunBanner({ run }: { run: IngestionRun | null }) {
   if (run.status === "running") {
     return (
       <div className="run-banner running">
-        Ingestion started {new Date(run.started_at).toLocaleString("en-ZA")} — still running.
+        Ingestion started {new Date(run.started_at).toLocaleString("en-ZA")}. Still running.
       </div>
     );
   }
@@ -135,7 +135,7 @@ function RunBanner({ run }: { run: IngestionRun | null }) {
 
   return (
     <div className="run-banner success">
-      Last ingestion succeeded {run.finished_at ? new Date(run.finished_at).toLocaleString("en-ZA") : "—"} —{" "}
+      Last ingestion succeeded {run.finished_at ? new Date(run.finished_at).toLocaleString("en-ZA") : "—"}:{" "}
       {run.records_fetched ?? 0} fetched, {run.records_new ?? 0} new, {run.records_updated ?? 0} updated.
     </div>
   );

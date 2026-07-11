@@ -11,7 +11,7 @@ const FEATURES = [
   {
     Icon: IconBuilding,
     title: "Round-the-clock monitoring",
-    body: "Every tender on the National Treasury eTenders feed is pulled in automatically — no manual checking, no missed opportunities.",
+    body: "Every tender on the National Treasury eTenders feed is pulled in automatically, so there's no manual checking and no missed opportunities.",
   },
   {
     Icon: IconTag,
@@ -26,7 +26,7 @@ const FEATURES = [
   {
     Icon: IconDocument,
     title: "SBD forms auto-filled",
-    body: "Store your company details once and generate pre-filled SBD 1, 4, 6.1, 8 and 9 for any tender — download as a PDF in a click.",
+    body: "Store your company details once and generate pre-filled SBD 1, 4, 6.1, 8 and 9 for any tender, ready to download as a PDF in a click.",
   },
   {
     Icon: IconClipboard,
@@ -44,7 +44,7 @@ const STEPS = [
   {
     n: "1",
     title: "Tell us what you do",
-    body: "Add your keywords, categories and provinces, and your company details — registration, tax, B-BBEE, banking. Once.",
+    body: "Add your keywords, categories and provinces, plus your company details: registration, tax, B-BBEE, banking. Just once.",
   },
   {
     n: "2",
@@ -66,7 +66,7 @@ export default function MarketingHomePage() {
         <h1 className="hero-title">Never miss a government tender your business can win.</h1>
         <p className="hero-subtitle">
           Tender9 watches the National Treasury eTenders feed around the clock, scores every new
-          tender against your business profile, and helps you prepare a compliant bid — from the
+          tender against your business profile, and helps you prepare a compliant bid, from the
           requirements checklist to pre-filled SBD forms.
         </p>
         <div className="hero-actions">
@@ -108,7 +108,7 @@ export default function MarketingHomePage() {
 
       <section className="cta-band">
         <h2>Set up your matching profile in minutes.</h2>
-        <p className="cta-sub">Start monitoring every SA government tender relevant to your business — free.</p>
+        <p className="cta-sub">Start monitoring every SA government tender relevant to your business, free.</p>
         <a href="/signup" className="btn-primary">
           Create your account
         </a>

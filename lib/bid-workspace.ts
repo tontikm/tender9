@@ -18,11 +18,11 @@ export const STANDARD_CHECKLIST: ChecklistGroup[] = [
   {
     heading: "SBD forms",
     items: [
-      { id: "sbd-1", label: "SBD 1 — Invitation to Bid / bidder's particulars" },
-      { id: "sbd-4", label: "SBD 4 — Declaration of Interest" },
-      { id: "sbd-6.1", label: "SBD 6.1 — Preference Points Claim" },
-      { id: "sbd-8", label: "SBD 8 — Declaration of past SCM practices" },
-      { id: "sbd-9", label: "SBD 9 — Certificate of Independent Bid Determination" },
+      { id: "sbd-1", label: "SBD 1: Invitation to Bid / bidder's particulars" },
+      { id: "sbd-4", label: "SBD 4: Declaration of Interest" },
+      { id: "sbd-6.1", label: "SBD 6.1: Preference Points Claim" },
+      { id: "sbd-8", label: "SBD 8: Declaration of past SCM practices" },
+      { id: "sbd-9", label: "SBD 9: Certificate of Independent Bid Determination" },
     ],
   },
   {

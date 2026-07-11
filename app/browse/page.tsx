@@ -113,7 +113,7 @@ export default async function BrowsePage({
     <main>
       <h1>Browse tenders</h1>
       <p className="subtitle">
-        Search every open tender in the eTenders feed — not only the ones matched to your profiles.
+        Search every open tender in the eTenders feed, not only the ones matched to your profiles.
       </p>
 
       <form className="browse-search" method="get" action="/browse">

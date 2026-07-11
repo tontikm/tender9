@@ -52,8 +52,8 @@ export default async function MyWorkspacePage({
     <main>
       <h1>My workspace</h1>
       <p className="subtitle">
-        Every bid you&apos;re currently working on, gathered in one place — no need to hunt for it
-        on the tender list.
+        Every bid you&apos;re currently working on, gathered in one place, so there&apos;s no need
+        to hunt for it on the tender list.
       </p>
 
       {entries.length === 0 ? (
@@ -61,8 +61,8 @@ export default async function MyWorkspacePage({
           <IconClipboard className="hub-empty-icon" />
           <h3>Nothing here yet</h3>
           <p>
-            Save a tender, mark one as applied, or start on its checklist or documents — it will
-            show up here automatically from then on.
+            Save a tender, mark one as applied, or start on its checklist or documents, and it
+            will show up here automatically from then on.
           </p>
           <a href="/dashboard" className="page-nav-cta">
             Browse matched tenders

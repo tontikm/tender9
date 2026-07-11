@@ -75,7 +75,7 @@ export function BidWorkspace({
       : status === "saved"
         ? "All changes saved"
         : status === "error"
-          ? "Couldn't save — check your connection"
+          ? "Couldn't save. Check your connection"
           : "";
 
   return (
