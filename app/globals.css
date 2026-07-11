@@ -1743,9 +1743,40 @@ button:hover,
   background: rgba(15, 118, 110, 0.08);
 }
 
-.fill-item.image {
+.fill-item.image,
+.fill-item.mark {
   padding: 0;
   line-height: 0;
+}
+
+.fill-marks {
+  display: flex;
+  gap: 8px;
+}
+
+.fill-mark-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 13px;
+  padding: 8px;
+}
+
+.fill-mark-btn svg {
+  width: 18px;
+  height: 18px;
+  color: var(--color-text);
+}
+
+.fill-mark-btn.armed {
+  border-color: var(--color-primary);
+  background: var(--color-primary-bg);
+}
+
+.fill-mark-btn.armed svg {
+  color: var(--color-primary);
 }
 
 .sig-pad {

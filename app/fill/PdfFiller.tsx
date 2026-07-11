@@ -15,20 +15,34 @@ export interface FillChip {
   value: string;
 }
 
+type MarkType = "check" | "cross";
+
 interface Placement {
   id: string;
   page: number; // 0-based
   xPct: number; // fraction of page width (top-left anchor)
   yPct: number; // fraction of page height
-  kind: "text" | "image";
+  kind: "text" | "image" | "mark";
   text?: string; // text placements
   dataUrl?: string; // image (signature) placements
   aspect?: number; // image width / height
-  size: number; // text: font size (pt); image: height (pt)
+  mark?: MarkType; // tick / cross placements
+  size: number; // text: font size (pt); image/mark: box size (pt)
 }
 
 // What's currently "armed" to be placed on the next page click.
-type Armed = { kind: "text"; text: string } | { kind: "image"; dataUrl: string; aspect: number } | null;
+type Armed =
+  | { kind: "text"; text: string }
+  | { kind: "image"; dataUrl: string; aspect: number }
+  | { kind: "mark"; mark: MarkType }
+  | null;
+
+// SVG paths (viewBox 0 0 24 24) reused for the on-page overlay and the PDF bake.
+const MARK_PATHS: Record<MarkType, [number, number][][]> = {
+  // each entry is a polyline of [x,y] points in 0..24 space
+  check: [[[4, 13], [10, 19], [20, 5]]],
+  cross: [[[5, 5], [19, 19]], [[19, 5], [5, 19]]],
+};
 
 interface SavedSig {
   dataUrl: string;
@@ -54,6 +68,9 @@ const MAX_SIZE = 24;
 const DEFAULT_SIG_HEIGHT = 30; // pt
 const MIN_SIG = 12;
 const MAX_SIG = 90;
+const DEFAULT_MARK = 16; // pt box
+const MIN_MARK = 8;
+const MAX_MARK = 48;
 
 // pdf-lib's standard Helvetica uses WinAnsi encoding — map smart punctuation
 // to safe equivalents and replace anything else it can't encode.
@@ -289,10 +306,14 @@ export function PdfFiller({
       xPct: clamp01((e.clientX - rect.left) / rect.width),
       yPct: clamp01((e.clientY - rect.top) / rect.height),
     };
-    const placement: Placement =
-      armed.kind === "text"
-        ? { ...base, kind: "text", text: armed.text, size: DEFAULT_SIZE }
-        : { ...base, kind: "image", dataUrl: armed.dataUrl, aspect: armed.aspect, size: DEFAULT_SIG_HEIGHT };
+    let placement: Placement;
+    if (armed.kind === "text") {
+      placement = { ...base, kind: "text", text: armed.text, size: DEFAULT_SIZE };
+    } else if (armed.kind === "image") {
+      placement = { ...base, kind: "image", dataUrl: armed.dataUrl, aspect: armed.aspect, size: DEFAULT_SIG_HEIGHT };
+    } else {
+      placement = { ...base, kind: "mark", mark: armed.mark, size: DEFAULT_MARK };
+    }
     setPlacements((ps) => [...ps, placement]);
     setArmed(null);
     setSelectedId(id);
@@ -330,8 +351,9 @@ export function PdfFiller({
     setPlacements((ps) =>
       ps.map((p) => {
         if (p.id !== selectedId) return p;
-        const [min, max] = p.kind === "image" ? [MIN_SIG, MAX_SIG] : [MIN_SIZE, MAX_SIZE];
-        const step = p.kind === "image" ? delta * 3 : delta;
+        const [min, max] =
+          p.kind === "image" ? [MIN_SIG, MAX_SIG] : p.kind === "mark" ? [MIN_MARK, MAX_MARK] : [MIN_SIZE, MAX_SIZE];
+        const step = p.kind === "text" ? delta : delta * 2;
         return { ...p, size: Math.min(max, Math.max(min, p.size + step)) };
       })
     );
@@ -348,7 +370,7 @@ export function PdfFiller({
     setDownloading(true);
     setError(null);
     try {
-      const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
+      const { PDFDocument, StandardFonts, rgb, LineCapStyle } = await import("pdf-lib");
       const doc = await PDFDocument.load(bytes, { ignoreEncryption: true });
       const font = await doc.embedFont(StandardFonts.Helvetica);
       for (const p of placements) {
@@ -367,6 +389,26 @@ export function PdfFiller({
             width: w,
             height: h,
           });
+          continue;
+        }
+
+        if (p.kind === "mark" && p.mark) {
+          const f = p.size / 24; // scale from the 0..24 path space
+          const x0 = p.xPct * width;
+          const yTop = height - p.yPct * height; // PDF y of the box's top edge
+          const ink = rgb(0.05, 0.05, 0.05);
+          const thickness = Math.max(1.1, p.size * 0.11);
+          for (const line of MARK_PATHS[p.mark]) {
+            for (let i = 0; i < line.length - 1; i++) {
+              page.drawLine({
+                start: { x: x0 + line[i][0] * f, y: yTop - line[i][1] * f },
+                end: { x: x0 + line[i + 1][0] * f, y: yTop - line[i + 1][1] * f },
+                thickness,
+                color: ink,
+                lineCap: LineCapStyle.Round,
+              });
+            }
+          }
           continue;
         }
 
@@ -429,7 +471,31 @@ export function PdfFiller({
             {placements
               .filter((p) => p.page === i)
               .map((p) =>
-                p.kind === "image" ? (
+                p.kind === "mark" && p.mark ? (
+                  <span
+                    key={p.id}
+                    className={`fill-item mark ${selectedId === p.id ? "selected" : ""}`}
+                    style={{ left: `${p.xPct * 100}%`, top: `${p.yPct * 100}%` }}
+                    onPointerDown={(e) => startDrag(e, p)}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <svg
+                      width={p.size * m.scale}
+                      height={p.size * m.scale}
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#0d0d0d"
+                      strokeWidth={2.6}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      style={{ display: "block" }}
+                    >
+                      {MARK_PATHS[p.mark].map((line, li) => (
+                        <polyline key={li} points={line.map(([x, y]) => `${x},${y}`).join(" ")} />
+                      ))}
+                    </svg>
+                  </span>
+                ) : p.kind === "image" ? (
                   <span
                     key={p.id}
                     className={`fill-item image ${selectedId === p.id ? "selected" : ""}`}
@@ -548,6 +614,35 @@ export function PdfFiller({
           </button>
         </div>
 
+        <h3 className="fill-heading">Ticks &amp; crosses</h3>
+        <div className="fill-marks">
+          <button
+            type="button"
+            className={`fill-mark-btn ${armed?.kind === "mark" && armed.mark === "check" ? "armed" : ""}`}
+            onClick={() =>
+              setArmed(armed?.kind === "mark" && armed.mark === "check" ? null : { kind: "mark", mark: "check" })
+            }
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="4,13 10,19 20,5" />
+            </svg>
+            Tick
+          </button>
+          <button
+            type="button"
+            className={`fill-mark-btn ${armed?.kind === "mark" && armed.mark === "cross" ? "armed" : ""}`}
+            onClick={() =>
+              setArmed(armed?.kind === "mark" && armed.mark === "cross" ? null : { kind: "mark", mark: "cross" })
+            }
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="5,5 19,19" />
+              <polyline points="19,5 5,19" />
+            </svg>
+            Cross
+          </button>
+        </div>
+
         <h3 className="fill-heading">Signature or initials</h3>
         {savedSig && (
           <button
@@ -570,7 +665,14 @@ export function PdfFiller({
         {armed && (
           <p className="fill-armed-note">
             Click on the document to place{" "}
-            <strong>{armed.kind === "text" ? `“${truncate(armed.text, 28)}”` : "your signature"}</strong>.{" "}
+            <strong>
+              {armed.kind === "text"
+                ? `“${truncate(armed.text, 28)}”`
+                : armed.kind === "mark"
+                  ? `a ${armed.mark === "check" ? "tick" : "cross"}`
+                  : "your signature"}
+            </strong>
+            .{" "}
             <button type="button" onClick={() => setArmed(null)}>
               Cancel
             </button>
@@ -580,7 +682,14 @@ export function PdfFiller({
         {selected && (
           <div className="fill-selected">
             <h3 className="fill-heading">
-              Selected: {selected.kind === "image" ? "signature" : `“${truncate(selected.text ?? "", 24)}”`}
+              Selected:{" "}
+              {selected.kind === "image"
+                ? "signature"
+                : selected.kind === "mark"
+                  ? selected.mark === "check"
+                    ? "tick"
+                    : "cross"
+                  : `“${truncate(selected.text ?? "", 24)}”`}
             </h3>
             <div className="fill-selected-controls">
               <button type="button" onClick={() => resizeSelected(-1)} aria-label="Smaller text">
