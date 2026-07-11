@@ -132,6 +132,13 @@ export default async function BidPackPage({ params }: { params: Promise<{ id: st
         </span>
       </div>
 
+      <div className="bid-pack-notice reference">
+        <strong>This is a reference sheet, not your submission.</strong> Departments require their
+        own SBD forms from the tender document. Use this to see your details laid out per form (and
+        your computed B-BBEE preference points), then{" "}
+        <a href={`/fill?tender=${id}`}>fill the official documents</a> to submit.
+      </div>
+
       {(!company || pack.missingFields.length > 0) && (
         <div className="bid-pack-notice">
           <strong>Some details are missing.</strong> The forms below are filled from your{" "}

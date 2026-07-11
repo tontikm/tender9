@@ -68,29 +68,35 @@ export default async function FillPage({
   }
   chips.push({ label: "Today's date", value: formatDate(new Date().toISOString()) });
 
-  // Optional: preload one of a tender's documents via the same-origin proxy.
-  let docUrl: string | undefined;
-  let docName: string | undefined;
-  let docKey: string | undefined;
+  // Load the tender's PDF documents (via the same-origin proxy) when opened
+  // from a tender. All of them go into a picker; `?doc=` chooses which loads
+  // first, otherwise the first PDF does.
+  let tenderDocs: { name: string; url: string; key: string }[] = [];
+  let initialKey: string | undefined;
   let tenderTitle: string | undefined;
 
-  const docIndex = Number.parseInt(params.doc ?? "", 10);
-  if (params.tender && Number.isInteger(docIndex) && docIndex >= 0) {
+  if (params.tender) {
     const { data: tender } = await supabase
       .from("tenders")
       .select("id, title, document_urls")
       .eq("id", params.tender)
       .maybeSingle<{ id: string; title: string; document_urls: string[] | null }>();
 
-    const doc = tender
-      ? describeDocuments(tender.document_urls).find((d) => d.index === docIndex)
-      : undefined;
-
-    if (tender && doc?.isPdf) {
-      docUrl = `/tenders/${tender.id}/document?i=${doc.index}`;
-      docName = doc.name;
-      docKey = `tender:${tender.id}:${doc.index}`;
+    if (tender) {
       tenderTitle = tender.title;
+      tenderDocs = describeDocuments(tender.document_urls)
+        .filter((d) => d.isPdf)
+        .map((d) => ({
+          name: d.name,
+          url: `/tenders/${tender.id}/document?i=${d.index}`,
+          key: `tender:${tender.id}:${d.index}`,
+        }));
+
+      const docIndex = Number.parseInt(params.doc ?? "", 10);
+      const wanted = Number.isInteger(docIndex)
+        ? tenderDocs.find((d) => d.key === `tender:${tender.id}:${docIndex}`)
+        : undefined;
+      initialKey = wanted?.key ?? tenderDocs[0]?.key;
     }
   }
 
@@ -99,17 +105,12 @@ export default async function FillPage({
       <h1>Fill a document</h1>
       <p className="subtitle">
         {tenderTitle
-          ? `Filling a document from ${tenderTitle}. `
+          ? `Filling documents from ${tenderTitle}. `
           : "Open any PDF — a tender's official forms or your own — and place your saved details exactly where they belong. "}
         Click a detail, then click the spot on the document. Works on scanned documents too.
       </p>
 
-      <PdfFiller
-        chips={chips}
-        initialDocUrl={docUrl}
-        initialDocName={docName}
-        initialDocKey={docKey}
-      />
+      <PdfFiller chips={chips} tenderDocs={tenderDocs} initialKey={initialKey} />
     </main>
   );
 }

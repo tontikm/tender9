@@ -64,25 +64,25 @@ async function loadPdfjs() {
 
 export function PdfFiller({
   chips,
-  initialDocUrl,
-  initialDocName,
-  initialDocKey,
+  tenderDocs = [],
+  initialKey,
 }: {
   chips: FillChip[];
-  initialDocUrl?: string;
-  initialDocName?: string;
-  initialDocKey?: string;
+  tenderDocs?: { name: string; url: string; key: string }[];
+  initialKey?: string;
 }) {
+  const firstKey = initialKey ?? tenderDocs[0]?.key ?? "";
   const [bytes, setBytes] = useState<Uint8Array | null>(null);
-  const [docName, setDocName] = useState(initialDocName ?? "");
+  const [docName, setDocName] = useState("");
   const [docKey, setDocKey] = useState("");
+  const [currentKey, setCurrentKey] = useState(firstKey);
   const [pages, setPages] = useState<PageMeta[]>([]);
   const [placements, setPlacements] = useState<Placement[]>([]);
   const [armed, setArmed] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [customText, setCustomText] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">(
-    initialDocUrl ? "loading" : "idle"
+    firstKey ? "loading" : "idle"
   );
   const [error, setError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
@@ -92,6 +92,7 @@ export function PdfFiller({
   const wrapRefs = useRef<(HTMLDivElement | null)[]>([]);
   const columnRef = useRef<HTMLDivElement | null>(null);
   const loadedKeyRef = useRef<string | null>(null);
+  const loadedDocKeyRef = useRef("");
 
   const openBytes = useCallback(async (data: Uint8Array, name: string, key: string) => {
     setStatus("loading");
@@ -117,6 +118,7 @@ export function PdfFiller({
       }
       canvasRefs.current = [];
       wrapRefs.current = [];
+      loadedDocKeyRef.current = key;
       setBytes(data);
       setDocName(name);
       setDocKey(key);
@@ -128,18 +130,20 @@ export function PdfFiller({
     }
   }, []);
 
-  // Load the initial (tender) document, if any.
+  // Load the selected tender document (on mount, and when the picker changes).
+  // Uploads set currentKey to their own key, which isn't in tenderDocs, so
+  // this effect leaves them alone.
   useEffect(() => {
-    if (!initialDocUrl) return;
+    const doc = tenderDocs.find((d) => d.key === currentKey);
+    if (!doc || loadedDocKeyRef.current === doc.key) return;
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(initialDocUrl);
+        setStatus("loading");
+        const res = await fetch(doc.url);
         if (!res.ok) throw new Error(`the server returned ${res.status}`);
         const buf = new Uint8Array(await res.arrayBuffer());
-        if (!cancelled) {
-          await openBytes(buf, initialDocName ?? "document.pdf", initialDocKey ?? `url:${initialDocUrl}`);
-        }
+        if (!cancelled) await openBytes(buf, doc.name, doc.key);
       } catch (e) {
         if (!cancelled) {
           setStatus("error");
@@ -150,7 +154,8 @@ export function PdfFiller({
     return () => {
       cancelled = true;
     };
-  }, [initialDocUrl, initialDocName, initialDocKey, openBytes]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentKey]);
 
   // Draw pages onto their canvases once metas exist.
   useEffect(() => {
@@ -221,7 +226,9 @@ export function PdfFiller({
       return;
     }
     const buf = new Uint8Array(await file.arrayBuffer());
-    await openBytes(buf, file.name, `upload:${file.name}:${file.size}`);
+    const key = `upload:${file.name}:${file.size}`;
+    await openBytes(buf, file.name, key);
+    setCurrentKey(key);
   };
 
   const onPageClick = (e: React.MouseEvent, pageIdx: number) => {
@@ -382,6 +389,26 @@ export function PdfFiller({
       </div>
 
       <aside className="fill-sidebar">
+        {tenderDocs.length > 0 && (
+          <div className="fill-docpicker">
+            <label htmlFor="fill-doc-select">Tender document</label>
+            <select
+              id="fill-doc-select"
+              value={tenderDocs.some((d) => d.key === docKey) ? docKey : ""}
+              onChange={(e) => setCurrentKey(e.target.value)}
+            >
+              {tenderDocs.map((d) => (
+                <option key={d.key} value={d.key}>
+                  {d.name}
+                </option>
+              ))}
+              {bytes && !tenderDocs.some((d) => d.key === docKey) && (
+                <option value="">Uploaded file</option>
+              )}
+            </select>
+          </div>
+        )}
+
         <label className="fill-upload">
           <input
             type="file"
