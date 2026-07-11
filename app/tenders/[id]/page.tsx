@@ -60,6 +60,17 @@ export default async function TenderDetailPage({
 
   const requirements = extractRequirements(tender.raw_payload);
 
+  // Which of this tender's documents does the user have an in-progress fill for?
+  const { data: savedFillRows } = await supabase
+    .from("document_fills")
+    .select("doc_key")
+    .eq("user_id", user?.id ?? "")
+    .eq("tender_id", id)
+    .returns<{ doc_key: string }[]>();
+  const savedDocIndexes = (savedFillRows ?? [])
+    .map((r) => Number.parseInt(r.doc_key.split(":")[2] ?? "", 10))
+    .filter((n) => Number.isInteger(n));
+
   const { data: matches } = await supabase
     .from("tender_matches")
     .select("id, match_score, status, matching_profiles!inner(name, user_id)")
@@ -154,7 +165,11 @@ export default async function TenderDetailPage({
       {tender.document_urls && tender.document_urls.length > 0 && (
         <>
           <h3 className="section-heading">Documents</h3>
-          <TenderDocuments tenderId={tender.id} documents={describeDocuments(tender.document_urls)} />
+          <TenderDocuments
+            tenderId={tender.id}
+            documents={describeDocuments(tender.document_urls)}
+            savedDocIndexes={savedDocIndexes}
+          />
         </>
       )}
 

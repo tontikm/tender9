@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { SignaturePad } from "./SignaturePad";
-import { saveFill, loadFill } from "./actions";
+import { saveFill, loadFill, deleteFill } from "./actions";
 
 export interface SavedFill {
   docKey: string;
@@ -407,6 +407,15 @@ export function PdfFiller({
     }
   };
 
+  const removeSaved = async (key: string) => {
+    setFills((prev) => prev.filter((f) => f.docKey !== key));
+    try {
+      await deleteFill(key);
+    } catch {
+      // ignore — the row is gone from the list either way; a refresh reconciles
+    }
+  };
+
   const onFile = async (file: File | undefined) => {
     if (!file) return;
     if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
@@ -586,7 +595,7 @@ export function PdfFiller({
     setError(null);
     try {
       const { PDFDocument, StandardFonts, rgb, LineCapStyle } = await import("pdf-lib");
-      const doc = await PDFDocument.load(bytes, { ignoreEncryption: true });
+      const doc = await PDFDocument.load(bytes, { ignoreEncryption: true, updateMetadata: false });
       const font = await doc.embedFont(StandardFonts.Helvetica);
       for (const p of placements) {
         if (p.page >= doc.getPageCount()) continue;
@@ -654,7 +663,9 @@ export function PdfFiller({
           });
         });
       }
-      const out = await doc.save();
+      // useObjectStreams:false skips the CPU-heavy object-stream compression —
+      // markedly faster to save large documents (a modestly larger file).
+      const out = await doc.save({ useObjectStreams: false });
       const blob = new Blob([out as unknown as BlobPart], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -818,18 +829,28 @@ export function PdfFiller({
         {fills.length > 0 && (
           <div className="fill-resume">
             <label>Continue where you left off</label>
-            {fills.slice(0, 5).map((f) => (
-              <button
-                key={f.docKey}
-                type="button"
-                className={`fill-resume-item ${f.docKey === docKey ? "current" : ""}`}
-                onClick={() => resumeFill(f.docKey)}
-                disabled={f.docKey === docKey}
-                title={f.docName}
-              >
-                <span className="fill-resume-name">{f.docName}</span>
-                <span className="fill-resume-date">{f.docKey === docKey ? "open" : f.updatedOn}</span>
-              </button>
+            {fills.slice(0, 6).map((f) => (
+              <div key={f.docKey} className={`fill-resume-item ${f.docKey === docKey ? "current" : ""}`}>
+                <button
+                  type="button"
+                  className="fill-resume-open"
+                  onClick={() => resumeFill(f.docKey)}
+                  disabled={f.docKey === docKey}
+                  title={f.docName}
+                >
+                  <span className="fill-resume-name">{f.docName}</span>
+                  <span className="fill-resume-date">{f.docKey === docKey ? "open" : f.updatedOn}</span>
+                </button>
+                <button
+                  type="button"
+                  className="fill-resume-del"
+                  aria-label={`Remove ${f.docName} from saved`}
+                  title="Remove from saved"
+                  onClick={() => removeSaved(f.docKey)}
+                >
+                  ×
+                </button>
+              </div>
             ))}
           </div>
         )}
