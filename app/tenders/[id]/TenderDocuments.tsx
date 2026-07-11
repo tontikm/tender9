@@ -6,11 +6,14 @@ import type { TenderDocument } from "@/lib/tender-docs";
 export function TenderDocuments({
   tenderId,
   documents,
+  savedDocIndexes = [],
 }: {
   tenderId: string;
   documents: TenderDocument[];
+  savedDocIndexes?: number[];
 }) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const saved = new Set(savedDocIndexes);
 
   return (
     <ul className="document-list">
@@ -24,9 +27,9 @@ export function TenderDocuments({
                 {doc.isPdf && (
                   <a
                     href={`/fill?tender=${tenderId}&doc=${doc.index}`}
-                    className="document-preview-btn"
+                    className={`document-preview-btn ${saved.has(doc.index) ? "resume" : ""}`}
                   >
-                    Fill
+                    {saved.has(doc.index) ? "Resume fill" : "Fill"}
                   </a>
                 )}
                 {doc.isPdf && (
