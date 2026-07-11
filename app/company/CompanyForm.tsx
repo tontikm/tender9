@@ -1,7 +1,17 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
+import { useFormStatus } from "react-dom";
 import { saveCompanyProfile, type SaveCompanyState } from "./actions";
+
+function SubmitButton() {
+  const { pending } = useFormStatus();
+  return (
+    <button type="submit" className="company-save-btn" disabled={pending}>
+      {pending ? "Saving…" : "Save company profile"}
+    </button>
+  );
+}
 
 export interface CompanyProfile {
   legal_name: string | null;
@@ -41,11 +51,37 @@ const BBBEE_LEVELS = [
 const INITIAL_STATE: SaveCompanyState = { ok: false, error: null };
 
 export function CompanyForm({ profile }: { profile: CompanyProfile | null }) {
-  const [state, formAction] = useActionState(saveCompanyProfile, INITIAL_STATE);
+  const [state, formAction, isPending] = useActionState(saveCompanyProfile, INITIAL_STATE);
+  const [saved, setSaved] = useState(false);
+  const wasPending = useRef(false);
   const v = (key: keyof CompanyProfile) => profile?.[key] ?? "";
+
+  // Surface a clear reaction each time a save completes successfully.
+  useEffect(() => {
+    if (isPending) {
+      wasPending.current = true;
+      return;
+    }
+    if (wasPending.current) {
+      wasPending.current = false;
+      if (state.ok) {
+        setSaved(true);
+        const t = setTimeout(() => setSaved(false), 3500);
+        return () => clearTimeout(t);
+      }
+    }
+  }, [isPending, state]);
 
   return (
     <form action={formAction} className="profile-card-form">
+      {saved && (
+        <div className="save-toast" role="status">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20 6 9 17l-5-5" />
+          </svg>
+          Company profile saved
+        </div>
+      )}
       <section className="form-section">
         <h3 className="form-section-heading">Company identity</h3>
         <div className="form-grid">
@@ -209,11 +245,10 @@ export function CompanyForm({ profile }: { profile: CompanyProfile | null }) {
       </section>
 
       {state.error && <p className="auth-error">{state.error}</p>}
-      {state.ok && <p className="form-success">Company profile saved.</p>}
 
       <div className="form-footer">
-        <span className="hint">Used to pre-fill bid paperwork. You can complete it in stages.</span>
-        <button type="submit">Save company profile</button>
+        <span className="hint">Used to fill your bid documents. You can complete it in stages.</span>
+        <SubmitButton />
       </div>
     </form>
   );

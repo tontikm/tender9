@@ -9,6 +9,29 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { SignaturePad } from "./SignaturePad";
+import { saveFill, loadFill } from "./actions";
+
+export interface SavedFill {
+  docKey: string;
+  docName: string;
+  updatedOn: string;
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let bin = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(bin);
+}
+
+function base64ToBytes(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
 
 export interface FillChip {
   label: string;
@@ -17,17 +40,24 @@ export interface FillChip {
 
 type MarkType = "check" | "cross";
 
+interface InkPoint {
+  x: number; // fraction of page width
+  y: number; // fraction of page height
+}
+
 interface Placement {
   id: string;
   page: number; // 0-based
-  xPct: number; // fraction of page width (top-left anchor)
+  xPct: number; // fraction of page width (top-left anchor; unused for ink)
   yPct: number; // fraction of page height
-  kind: "text" | "image" | "mark";
+  kind: "text" | "image" | "mark" | "ink";
   text?: string; // text placements
   dataUrl?: string; // image (signature) placements
   aspect?: number; // image width / height
   mark?: MarkType; // tick / cross placements
-  size: number; // text: font size (pt); image/mark: box size (pt)
+  points?: InkPoint[]; // freehand-pen placements
+  color?: string; // ink colour (hex)
+  size: number; // text: font size; image/mark: box size; ink: stroke thickness (pt)
 }
 
 // What's currently "armed" to be placed on the next page click.
@@ -71,6 +101,19 @@ const MAX_SIG = 90;
 const DEFAULT_MARK = 16; // pt box
 const MIN_MARK = 8;
 const MAX_MARK = 48;
+const DEFAULT_INK = 1.8; // pt stroke
+const MIN_INK = 0.8;
+const MAX_INK = 6;
+const PEN_COLORS = ["#1a1a1a", "#c81e1e", "#1d4ed8"]; // black, red, blue
+
+function hexToRgb01(hex: string): [number, number, number] {
+  const n = hex.replace("#", "");
+  return [
+    parseInt(n.slice(0, 2), 16) / 255,
+    parseInt(n.slice(2, 4), 16) / 255,
+    parseInt(n.slice(4, 6), 16) / 255,
+  ];
+}
 
 // pdf-lib's standard Helvetica uses WinAnsi encoding — map smart punctuation
 // to safe equivalents and replace anything else it can't encode.
@@ -105,10 +148,12 @@ export function PdfFiller({
   chips,
   tenderDocs = [],
   initialKey,
+  savedFills = [],
 }: {
   chips: FillChip[];
   tenderDocs?: { name: string; url: string; key: string }[];
   initialKey?: string;
+  savedFills?: SavedFill[];
 }) {
   const firstKey = initialKey ?? tenderDocs[0]?.key ?? "";
   const [bytes, setBytes] = useState<Uint8Array | null>(null);
@@ -121,6 +166,12 @@ export function PdfFiller({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [customText, setCustomText] = useState("");
   const [savedSig, setSavedSig] = useState<SavedSig | null>(null);
+  const [drawMode, setDrawMode] = useState(false);
+  const [penColor, setPenColor] = useState(PEN_COLORS[0]);
+  const [draftPage, setDraftPage] = useState<number | null>(null);
+  const [draftPoints, setDraftPoints] = useState<InkPoint[]>([]);
+  const [fills, setFills] = useState<SavedFill[]>(savedFills);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">(
     firstKey ? "loading" : "idle"
   );
@@ -133,6 +184,7 @@ export function PdfFiller({
   const columnRef = useRef<HTMLDivElement | null>(null);
   const loadedKeyRef = useRef<string | null>(null);
   const loadedDocKeyRef = useRef("");
+  const strokeRef = useRef<{ page: number; points: InkPoint[] } | null>(null);
 
   const openBytes = useCallback(async (data: Uint8Array, name: string, key: string) => {
     setStatus("loading");
@@ -223,16 +275,38 @@ export function PdfFiller({
     };
   }, [pages, docKey]);
 
-  // Placements persist per document on this device.
+  // Restore this document's placements: prefer the copy saved to the
+  // workspace (server, cross-device), fall back to the local auto-cache.
   useEffect(() => {
     if (!docKey) return;
-    try {
-      const raw = localStorage.getItem(`t9-fill:${docKey}`);
-      setPlacements(raw ? (JSON.parse(raw) as Placement[]) : []);
-    } catch {
-      setPlacements([]);
-    }
-    loadedKeyRef.current = docKey;
+    loadedKeyRef.current = null; // pause the local auto-save until this loads
+    let cancelled = false;
+    (async () => {
+      let next: Placement[] = [];
+      try {
+        const saved = await loadFill(docKey);
+        if (saved && Array.isArray(saved.placements)) {
+          next = saved.placements as Placement[];
+        } else {
+          const raw = localStorage.getItem(`t9-fill:${docKey}`);
+          next = raw ? (JSON.parse(raw) as Placement[]) : [];
+        }
+      } catch {
+        try {
+          const raw = localStorage.getItem(`t9-fill:${docKey}`);
+          next = raw ? (JSON.parse(raw) as Placement[]) : [];
+        } catch {
+          next = [];
+        }
+      }
+      if (cancelled) return;
+      setPlacements(next);
+      setSelectedId(null);
+      loadedKeyRef.current = docKey;
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [docKey]);
 
   useEffect(() => {
@@ -269,6 +343,11 @@ export function PdfFiller({
     }
   }, []);
 
+  // Arming an item and pen-draw mode are mutually exclusive.
+  useEffect(() => {
+    if (armed) setDrawMode(false);
+  }, [armed]);
+
   const useSignature = (dataUrl: string, aspect: number) => {
     setArmed({ kind: "image", dataUrl, aspect });
     setSavedSig({ dataUrl, aspect });
@@ -276,6 +355,55 @@ export function PdfFiller({
       localStorage.setItem("t9-signature", JSON.stringify({ dataUrl, aspect }));
     } catch {
       // storage full/blocked — still usable this session
+    }
+  };
+
+  const saveToWorkspace = async () => {
+    if (!bytes || !docKey) return;
+    setSaveState("saving");
+    const isUpload = docKey.startsWith("upload:");
+    const tenderId = docKey.startsWith("tender:") ? docKey.split(":")[1] ?? null : null;
+    const res = await saveFill({
+      docKey,
+      docName: docName || "document.pdf",
+      tenderId,
+      placements,
+      pdfBase64: isUpload ? bytesToBase64(bytes) : null,
+    });
+    if (res.ok) {
+      setSaveState("saved");
+      setFills((prev) => {
+        const rest = prev.filter((f) => f.docKey !== docKey);
+        return [{ docKey, docName: docName || "document.pdf", updatedOn: "just now" }, ...rest];
+      });
+      setTimeout(() => setSaveState("idle"), 2500);
+    } else {
+      setSaveState("error");
+      setError(res.error);
+    }
+  };
+
+  const resumeFill = async (key: string) => {
+    setStatus("loading");
+    setError(null);
+    try {
+      const saved = await loadFill(key);
+      if (!saved) throw new Error("this saved document could not be found");
+      if (saved.pdfBase64) {
+        await openBytes(base64ToBytes(saved.pdfBase64), saved.docName, key);
+      } else if (key.startsWith("tender:")) {
+        const [, tid, idx] = key.split(":");
+        const res = await fetch(`/tenders/${tid}/document?i=${idx}`);
+        if (!res.ok) throw new Error(`the server returned ${res.status}`);
+        await openBytes(new Uint8Array(await res.arrayBuffer()), saved.docName, key);
+      } else {
+        throw new Error("the original file is not available — re-open it to continue");
+      }
+      // openBytes set docKey -> the restore effect applies the saved placements.
+      setCurrentKey(key);
+    } catch (e) {
+      setStatus("error");
+      setError(`Could not resume: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
 
@@ -291,7 +419,88 @@ export function PdfFiller({
     setCurrentKey(key);
   };
 
+  const pageFraction = (e: { clientX: number; clientY: number }, pageIdx: number): InkPoint | null => {
+    const wrap = wrapRefs.current[pageIdx];
+    if (!wrap) return null;
+    const rect = wrap.getBoundingClientRect();
+    return { x: clamp01((e.clientX - rect.left) / rect.width), y: clamp01((e.clientY - rect.top) / rect.height) };
+  };
+
+  const startStroke = (e: React.PointerEvent, pageIdx: number) => {
+    const p = pageFraction(e, pageIdx);
+    if (!p) return;
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // no active pointer to capture (e.g. synthetic events) — drawing still works
+    }
+    setSelectedId(null);
+    strokeRef.current = { page: pageIdx, points: [p] };
+    setDraftPage(pageIdx);
+    setDraftPoints([p]);
+  };
+
+  const extendStroke = (e: React.PointerEvent, pageIdx: number) => {
+    const active = strokeRef.current;
+    if (!active || active.page !== pageIdx) return;
+    const p = pageFraction(e, pageIdx);
+    if (!p) return;
+    active.points.push(p);
+    setDraftPoints([...active.points]);
+  };
+
+  const endStroke = () => {
+    const active = strokeRef.current;
+    if (active && active.points.length >= 2) {
+      setPlacements((ps) => [
+        ...ps,
+        {
+          id: crypto.randomUUID(),
+          page: active.page,
+          xPct: 0,
+          yPct: 0,
+          kind: "ink",
+          points: active.points,
+          color: penColor,
+          size: DEFAULT_INK,
+        },
+      ]);
+    }
+    strokeRef.current = null;
+    setDraftPage(null);
+    setDraftPoints([]);
+  };
+
+  const dragInk = (e: React.PointerEvent, placement: Placement) => {
+    e.stopPropagation();
+    setSelectedId(placement.id);
+    const wrap = wrapRefs.current[placement.page];
+    if (!wrap || !placement.points) return;
+    const rect = wrap.getBoundingClientRect();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const orig = placement.points;
+    const move = (ev: PointerEvent) => {
+      const dx = (ev.clientX - startX) / rect.width;
+      const dy = (ev.clientY - startY) / rect.height;
+      setPlacements((ps) =>
+        ps.map((p) =>
+          p.id === placement.id
+            ? { ...p, points: orig.map((pt) => ({ x: clamp01(pt.x + dx), y: clamp01(pt.y + dy) })) }
+            : p
+        )
+      );
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+
   const onPageClick = (e: React.MouseEvent, pageIdx: number) => {
+    if (drawMode) return; // pointer handlers draw instead
     if (!armed) {
       setSelectedId(null);
       return;
@@ -352,8 +561,14 @@ export function PdfFiller({
       ps.map((p) => {
         if (p.id !== selectedId) return p;
         const [min, max] =
-          p.kind === "image" ? [MIN_SIG, MAX_SIG] : p.kind === "mark" ? [MIN_MARK, MAX_MARK] : [MIN_SIZE, MAX_SIZE];
-        const step = p.kind === "text" ? delta : delta * 2;
+          p.kind === "image"
+            ? [MIN_SIG, MAX_SIG]
+            : p.kind === "mark"
+              ? [MIN_MARK, MAX_MARK]
+              : p.kind === "ink"
+                ? [MIN_INK, MAX_INK]
+                : [MIN_SIZE, MAX_SIZE];
+        const step = p.kind === "text" ? delta : p.kind === "ink" ? delta * 0.5 : delta * 2;
         return { ...p, size: Math.min(max, Math.max(min, p.size + step)) };
       })
     );
@@ -412,6 +627,20 @@ export function PdfFiller({
           continue;
         }
 
+        if (p.kind === "ink" && p.points && p.points.length >= 2) {
+          const [r, g, b] = hexToRgb01(p.color ?? "#1a1a1a");
+          for (let i = 0; i < p.points.length - 1; i++) {
+            page.drawLine({
+              start: { x: p.points[i].x * width, y: height - p.points[i].y * height },
+              end: { x: p.points[i + 1].x * width, y: height - p.points[i + 1].y * height },
+              thickness: p.size,
+              color: rgb(r, g, b),
+              lineCap: LineCapStyle.Round,
+            });
+          }
+          continue;
+        }
+
         const lines = sanitizeForPdf(p.text ?? "").split("\n");
         lines.forEach((line, li) => {
           page.drawText(line, {
@@ -445,7 +674,7 @@ export function PdfFiller({
 
   return (
     <div className="fill-layout">
-      <div className={`fill-pages ${armed ? "armed" : ""}`} ref={columnRef}>
+      <div className={`fill-pages ${armed || drawMode ? "armed" : ""}`} ref={columnRef}>
         {status === "idle" && (
           <p className="fill-status">
             Open a PDF to get started — a tender document, or any form saved on your computer.
@@ -456,20 +685,71 @@ export function PdfFiller({
         {pages.map((m, i) => (
           <div
             key={`${docKey}:${i}`}
-            className="fill-page"
+            className={`fill-page ${drawMode ? "drawing" : ""}`}
             style={{ width: m.cssW, height: m.cssH }}
             ref={(el) => {
               wrapRefs.current[i] = el;
             }}
             onClick={(e) => onPageClick(e, i)}
+            onPointerDown={drawMode ? (e) => startStroke(e, i) : undefined}
+            onPointerMove={drawMode ? (e) => extendStroke(e, i) : undefined}
+            onPointerUp={drawMode ? endStroke : undefined}
           >
             <canvas
               ref={(el) => {
                 canvasRefs.current[i] = el;
               }}
             />
+            {/* freehand strokes (existing + the one being drawn) */}
+            {(() => {
+              const inkOnPage = placements.filter((p) => p.page === i && p.kind === "ink");
+              const draft =
+                draftPage === i && draftPoints.length > 0
+                  ? [{ points: draftPoints, color: penColor, size: DEFAULT_INK, id: "__draft", selected: false }]
+                  : [];
+              const strokes = [
+                ...inkOnPage.map((p) => ({
+                  points: p.points ?? [],
+                  color: p.color ?? "#1a1a1a",
+                  size: p.size,
+                  id: p.id,
+                  selected: selectedId === p.id,
+                })),
+                ...draft,
+              ];
+              if (strokes.length === 0) return null;
+              return (
+                <svg
+                  className="fill-ink-layer"
+                  viewBox="0 0 1 1"
+                  preserveAspectRatio="none"
+                  width={m.cssW}
+                  height={m.cssH}
+                >
+                  {strokes.map((s) => (
+                    <polyline
+                      key={s.id}
+                      points={s.points.map((pt) => `${pt.x},${pt.y}`).join(" ")}
+                      fill="none"
+                      stroke={s.selected ? "#0f766e" : s.color}
+                      strokeWidth={s.size * m.scale}
+                      vectorEffect="non-scaling-stroke"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      pointerEvents={drawMode || s.id === "__draft" ? "none" : "stroke"}
+                      style={{ cursor: "move" }}
+                      onPointerDown={(e) => {
+                        const p = placements.find((pp) => pp.id === s.id);
+                        if (p) dragInk(e, p);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  ))}
+                </svg>
+              );
+            })()}
             {placements
-              .filter((p) => p.page === i)
+              .filter((p) => p.page === i && p.kind !== "ink")
               .map((p) =>
                 p.kind === "mark" && p.mark ? (
                   <span
@@ -535,6 +815,25 @@ export function PdfFiller({
       </div>
 
       <aside className="fill-sidebar">
+        {fills.length > 0 && (
+          <div className="fill-resume">
+            <label>Continue where you left off</label>
+            {fills.slice(0, 5).map((f) => (
+              <button
+                key={f.docKey}
+                type="button"
+                className={`fill-resume-item ${f.docKey === docKey ? "current" : ""}`}
+                onClick={() => resumeFill(f.docKey)}
+                disabled={f.docKey === docKey}
+                title={f.docName}
+              >
+                <span className="fill-resume-name">{f.docName}</span>
+                <span className="fill-resume-date">{f.docKey === docKey ? "open" : f.updatedOn}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         {tenderDocs.length > 0 && (
           <div className="fill-docpicker">
             <label htmlFor="fill-doc-select">Tender document</label>
@@ -643,6 +942,54 @@ export function PdfFiller({
           </button>
         </div>
 
+        <h3 className="fill-heading">Pen — circle or underline</h3>
+        <div className="fill-pen">
+          <button
+            type="button"
+            className={`fill-pen-toggle ${drawMode ? "on" : ""}`}
+            onClick={() => setDrawMode((d) => !d)}
+          >
+            {drawMode ? "Drawing — click to stop" : "Draw on the document"}
+          </button>
+          <div className="fill-pen-colors">
+            {PEN_COLORS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                className={`fill-pen-color ${penColor === c ? "on" : ""}`}
+                style={{ background: c }}
+                aria-label={`Pen colour ${c}`}
+                onClick={() => {
+                  setPenColor(c);
+                  setDrawMode(true);
+                }}
+              />
+            ))}
+          </div>
+        </div>
+        {placements.some((p) => p.kind === "ink") && (
+          <button
+            type="button"
+            className="fill-clear"
+            onClick={() =>
+              setPlacements((ps) => {
+                const lastInk = [...ps].reverse().find((p) => p.kind === "ink");
+                return lastInk ? ps.filter((p) => p.id !== lastInk.id) : ps;
+              })
+            }
+          >
+            Undo last drawing
+          </button>
+        )}
+        {drawMode && (
+          <p className="fill-armed-note">
+            Draw on the document to circle or underline an option.{" "}
+            <button type="button" onClick={() => setDrawMode(false)}>
+              Done
+            </button>
+          </p>
+        )}
+
         <h3 className="fill-heading">Signature or initials</h3>
         {savedSig && (
           <button
@@ -685,11 +1032,13 @@ export function PdfFiller({
               Selected:{" "}
               {selected.kind === "image"
                 ? "signature"
-                : selected.kind === "mark"
-                  ? selected.mark === "check"
-                    ? "tick"
-                    : "cross"
-                  : `“${truncate(selected.text ?? "", 24)}”`}
+                : selected.kind === "ink"
+                  ? "drawing"
+                  : selected.kind === "mark"
+                    ? selected.mark === "check"
+                      ? "tick"
+                      : "cross"
+                    : `“${truncate(selected.text ?? "", 24)}”`}
             </h3>
             <div className="fill-selected-controls">
               <button type="button" onClick={() => resizeSelected(-1)} aria-label="Smaller text">
@@ -708,6 +1057,18 @@ export function PdfFiller({
         )}
 
         <div className="fill-actions">
+          <button
+            type="button"
+            className="fill-save-workspace"
+            disabled={!bytes || saveState === "saving"}
+            onClick={saveToWorkspace}
+          >
+            {saveState === "saving"
+              ? "Saving…"
+              : saveState === "saved"
+                ? "Saved to workspace ✓"
+                : "Save to workspace"}
+          </button>
           <button
             type="button"
             className="fill-download"
@@ -729,8 +1090,8 @@ export function PdfFiller({
             </button>
           )}
           <p className="hint">
-            The original document is untouched — your text is written on top. Placements save
-            automatically on this device.
+            The original document is untouched — your marks go on top. <strong>Save to workspace</strong>{" "}
+            to come back and finish later on any device.
           </p>
         </div>
 

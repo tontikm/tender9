@@ -59,6 +59,21 @@ export default async function FillPage({
     .eq("user_id", user?.id ?? "")
     .maybeSingle<CompanyRow>();
 
+  // Lightweight list of the user's saved in-progress fills (no bytes) so they
+  // can resume any of them. Full data is fetched on demand via loadFill().
+  const { data: savedRows } = await supabase
+    .from("document_fills")
+    .select("doc_key, doc_name, tender_id, updated_at")
+    .eq("user_id", user?.id ?? "")
+    .order("updated_at", { ascending: false })
+    .returns<{ doc_key: string; doc_name: string; tender_id: string | null; updated_at: string }[]>();
+
+  const savedFills = (savedRows ?? []).map((r) => ({
+    docKey: r.doc_key,
+    docName: r.doc_name,
+    updatedOn: formatDate(r.updated_at),
+  }));
+
   const chips: FillChip[] = [];
   if (company) {
     for (const [key, label] of CHIP_FIELDS) {
@@ -110,7 +125,12 @@ export default async function FillPage({
         Click a detail, then click the spot on the document. Works on scanned documents too.
       </p>
 
-      <PdfFiller chips={chips} tenderDocs={tenderDocs} initialKey={initialKey} />
+      <PdfFiller
+        chips={chips}
+        tenderDocs={tenderDocs}
+        initialKey={initialKey}
+        savedFills={savedFills}
+      />
     </main>
   );
 }
