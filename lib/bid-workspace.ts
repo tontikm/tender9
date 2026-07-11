@@ -90,3 +90,22 @@ export function checklistProgress(checklist: WorkspaceChecklist): {
     total: standardTotal + checklist.custom.length,
   };
 }
+
+export interface ClosingInfo {
+  label: string;
+  urgent: boolean;
+  days: number;
+}
+
+// Days until closing, computed server-side to avoid a hydration mismatch.
+// `days` is exposed so callers can sort by urgency, not just display a label.
+export function closingInfo(closingDate: string | null | undefined): ClosingInfo | null {
+  if (!closingDate) return null;
+  const closing = new Date(closingDate);
+  const now = new Date();
+  const days = Math.ceil((closing.getTime() - now.getTime()) / 86_400_000);
+  if (days < 0) return { label: "Closed", urgent: true, days };
+  if (days === 0) return { label: "Closes today", urgent: true, days };
+  if (days === 1) return { label: "Closes tomorrow", urgent: true, days };
+  return { label: `Closes in ${days} days`, urgent: days <= 7, days };
+}
