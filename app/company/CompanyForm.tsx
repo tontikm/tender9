@@ -33,6 +33,33 @@ export interface CompanyProfile {
   bank_branch_code: string | null;
   signatory_name: string | null;
   signatory_capacity: string | null;
+  logo_data_url: string | null;
+}
+
+const LOGO_MAX_DIMENSION = 400;
+
+// Downscales/re-encodes any uploaded image to a PNG data URL client-side, so
+// we never store a multi-megabyte photo straight from someone's phone.
+function resizeLogo(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Could not read the file"));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("Could not read the image"));
+      img.onload = () => {
+        const ratio = Math.min(1, LOGO_MAX_DIMENSION / Math.max(img.width, img.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * ratio);
+        canvas.height = Math.round(img.height * ratio);
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/png"));
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 const BBBEE_LEVELS = [
@@ -53,8 +80,20 @@ const INITIAL_STATE: SaveCompanyState = { ok: false, error: null };
 export function CompanyForm({ profile }: { profile: CompanyProfile | null }) {
   const [state, formAction, isPending] = useActionState(saveCompanyProfile, INITIAL_STATE);
   const [saved, setSaved] = useState(false);
+  const [logo, setLogo] = useState(profile?.logo_data_url ?? "");
+  const [logoError, setLogoError] = useState<string | null>(null);
   const wasPending = useRef(false);
   const v = (key: keyof CompanyProfile) => profile?.[key] ?? "";
+
+  const handleLogoFile = async (file: File | undefined) => {
+    if (!file) return;
+    setLogoError(null);
+    try {
+      setLogo(await resizeLogo(file));
+    } catch {
+      setLogoError("Couldn't read that image. Try a PNG or JPG file.");
+    }
+  };
 
   // Surface a clear reaction each time a save completes successfully.
   useEffect(() => {
@@ -82,6 +121,36 @@ export function CompanyForm({ profile }: { profile: CompanyProfile | null }) {
           Company profile saved
         </div>
       )}
+      <section className="form-section">
+        <h3 className="form-section-heading">Company logo</h3>
+        <p className="hint">Appears on your request-for-quotation documents.</p>
+        <div className="logo-upload">
+          {logo ? (
+            <img src={logo} alt="Company logo" className="logo-preview" />
+          ) : (
+            <div className="logo-preview logo-preview-empty">No logo</div>
+          )}
+          <div className="logo-upload-actions">
+            <label className="btn logo-upload-btn">
+              {logo ? "Change logo" : "Upload logo"}
+              <input
+                type="file"
+                accept="image/png,image/jpeg"
+                onChange={(e) => handleLogoFile(e.target.files?.[0])}
+                hidden
+              />
+            </label>
+            {logo && (
+              <button type="button" className="btn" onClick={() => setLogo("")}>
+                Remove
+              </button>
+            )}
+          </div>
+          {logoError && <p className="auth-error">{logoError}</p>}
+        </div>
+        <input type="hidden" name="logo_data_url" value={logo} />
+      </section>
+
       <section className="form-section">
         <h3 className="form-section-heading">Company identity</h3>
         <div className="form-grid">

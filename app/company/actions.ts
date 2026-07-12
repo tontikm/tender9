@@ -39,6 +39,13 @@ function textOrNull(formData: FormData, name: string): string | null {
   return value ? value : null;
 }
 
+// The logo is already resized/re-encoded to a PNG data URL client-side
+// before the form submits. An empty value means "no logo" or "removed".
+function logoOrNull(formData: FormData): string | null {
+  const value = formData.get("logo_data_url")?.toString() ?? "";
+  return value.startsWith("data:image") ? value : null;
+}
+
 export async function saveCompanyProfile(
   _prevState: SaveCompanyState,
   formData: FormData
@@ -54,6 +61,7 @@ export async function saveCompanyProfile(
     // <input type=date> gives "" when empty and a valid "YYYY-MM-DD" otherwise.
     record[field] = textOrNull(formData, field);
   }
+  record.logo_data_url = logoOrNull(formData);
   record.updated_at = new Date().toISOString();
 
   const supabase = await getSupabaseAuthClient();

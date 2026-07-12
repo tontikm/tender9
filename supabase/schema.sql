@@ -75,9 +75,12 @@ create table if not exists company_profiles (
   bank_branch_code text,
   signatory_name text,           -- person authorised to sign bids
   signatory_capacity text,       -- their role, e.g. "Director"
+  logo_data_url text,            -- company logo, stored as a data: URL (resized client-side)
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
+
+alter table company_profiles add column if not exists logo_data_url text;
 
 -- Bid workspace: per-user, per-tender bid-preparation state — the checklist
 -- of SBD forms/documents/tasks the user has ticked off, plus free-text notes.
@@ -115,6 +118,28 @@ create table if not exists document_fills (
 );
 
 create index if not exists idx_document_fills_user_id on document_fills (user_id);
+
+-- Requests for quotation: a document a user builds to send to suppliers
+-- asking them to price a list of items, generated with the user's company
+-- details/logo. Not tied to submitting a bid — a sourcing tool the user
+-- fills in once and can revisit to adjust items or re-send to another
+-- supplier. tender_id is nullable since a user may want to source quotes
+-- before (or without) linking the request to a specific tender.
+create table if not exists rfqs (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  tender_id uuid references tenders(id) on delete set null,
+  title text not null default 'Request for Quotation',
+  recipient_name text,
+  recipient_email text,
+  due_date date,
+  notes text,
+  items jsonb not null default '[]'::jsonb,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create index if not exists idx_rfqs_user_id on rfqs (user_id);
 
 -- Matches: which tenders matched which profile
 create table if not exists tender_matches (
@@ -163,6 +188,7 @@ alter table matching_profiles enable row level security;
 alter table company_profiles enable row level security;
 alter table bid_workspaces enable row level security;
 alter table document_fills enable row level security;
+alter table rfqs enable row level security;
 alter table tender_matches enable row level security;
 alter table tender_drafts enable row level security;
 alter table ingestion_runs enable row level security;
@@ -202,6 +228,14 @@ create policy "Users manage their own company profile"
 drop policy if exists "Users manage their own bid workspaces" on bid_workspaces;
 create policy "Users manage their own bid workspaces"
   on bid_workspaces for all
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- rfqs: an account only ever sees/manages its own requests for quotation.
+drop policy if exists "Users manage their own rfqs" on rfqs;
+create policy "Users manage their own rfqs"
+  on rfqs for all
   to authenticated
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);

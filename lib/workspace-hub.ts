@@ -19,6 +19,13 @@ export interface WorkspaceDoc {
   updatedAt: string;
 }
 
+export interface WorkspaceRfq {
+  id: string;
+  title: string;
+  recipientName: string | null;
+  updatedAt: string;
+}
+
 export interface WorkspaceEntry {
   tender: WorkspaceTender;
   hasChecklist: boolean;
@@ -26,6 +33,7 @@ export interface WorkspaceEntry {
   progressTotal: number;
   notes: string | null;
   docs: WorkspaceDoc[];
+  rfqs: WorkspaceRfq[];
   matchStatus: "saved" | "applied" | null;
   closing: ClosingInfo | null;
   lastActivity: string | null;
@@ -45,19 +53,28 @@ interface DocumentFillRow {
   updated_at: string;
 }
 
+interface RfqRow {
+  id: string;
+  tender_id: string | null;
+  title: string;
+  recipient_name: string | null;
+  updated_at: string;
+}
+
 interface MatchRow {
   tender_id: string;
   status: string;
 }
 
 // A tender belongs in "My workspace" once the user has started work on it —
-// ticked a checklist item, begun filling a document, or saved/applied to it —
-// so it shows up automatically without them having to go find it again.
+// ticked a checklist item, begun filling a document, requested a quote, or
+// saved/applied to it — so it shows up automatically without them having to
+// go find it again.
 export async function getWorkspaceEntries(
   supabase: Awaited<ReturnType<typeof getSupabaseAuthClient>>,
   userId: string
 ): Promise<WorkspaceEntry[]> {
-  const [{ data: workspaces }, { data: fills }, { data: matches }] = await Promise.all([
+  const [{ data: workspaces }, { data: fills }, { data: rfqs }, { data: matches }] = await Promise.all([
     supabase
       .from("bid_workspaces")
       .select("tender_id, checklist, notes, updated_at")
@@ -69,6 +86,12 @@ export async function getWorkspaceEntries(
       .eq("user_id", userId)
       .not("tender_id", "is", null)
       .returns<DocumentFillRow[]>(),
+    supabase
+      .from("rfqs")
+      .select("id, tender_id, title, recipient_name, updated_at")
+      .eq("user_id", userId)
+      .not("tender_id", "is", null)
+      .returns<RfqRow[]>(),
     supabase
       .from("tender_matches")
       .select("tender_id, status, matching_profiles!inner(user_id)")
@@ -85,10 +108,22 @@ export async function getWorkspaceEntries(
     list.push(f);
     fillsByTender.set(f.tender_id, list);
   }
+  const rfqsByTender = new Map<string, RfqRow[]>();
+  for (const r of rfqs ?? []) {
+    if (!r.tender_id) continue;
+    const list = rfqsByTender.get(r.tender_id) ?? [];
+    list.push(r);
+    rfqsByTender.set(r.tender_id, list);
+  }
   const matchByTender = new Map((matches ?? []).map((m) => [m.tender_id, m.status]));
 
   const tenderIds = Array.from(
-    new Set<string>([...workspaceByTender.keys(), ...fillsByTender.keys(), ...matchByTender.keys()])
+    new Set<string>([
+      ...workspaceByTender.keys(),
+      ...fillsByTender.keys(),
+      ...rfqsByTender.keys(),
+      ...matchByTender.keys(),
+    ])
   );
   if (tenderIds.length === 0) return [];
 
@@ -114,11 +149,22 @@ export async function getWorkspaceEntries(
           updatedAt: d.updated_at,
         };
       });
+    const rfqEntries = (rfqsByTender.get(tender.id) ?? [])
+      .slice()
+      .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+      .map((r) => ({
+        id: r.id,
+        title: r.title,
+        recipientName: r.recipient_name,
+        updatedAt: r.updated_at,
+      }));
     const matchStatus = (matchByTender.get(tender.id) as "saved" | "applied" | undefined) ?? null;
     const closing = closingInfo(tender.closing_date);
-    const activityDates = [workspace?.updated_at, ...docs.map((d) => d.updatedAt)].filter(
-      (d): d is string => !!d
-    );
+    const activityDates = [
+      workspace?.updated_at,
+      ...docs.map((d) => d.updatedAt),
+      ...rfqEntries.map((r) => r.updatedAt),
+    ].filter((d): d is string => !!d);
     const lastActivity = activityDates.length ? activityDates.sort().at(-1)! : null;
 
     return {
@@ -128,6 +174,7 @@ export async function getWorkspaceEntries(
       progressTotal: progress.total,
       notes: workspace?.notes ?? null,
       docs,
+      rfqs: rfqEntries,
       matchStatus,
       closing,
       lastActivity,

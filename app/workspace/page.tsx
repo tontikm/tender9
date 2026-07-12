@@ -1,7 +1,13 @@
 import { getSupabaseAuthClient, getCurrentUser } from "@/lib/supabase-auth";
 import { getWorkspaceEntries, sortWorkspaceEntries, type WorkspaceEntry } from "@/lib/workspace-hub";
 import { formatDate, formatValue } from "@/lib/format";
-import { IconBuilding, IconTag, IconMapPin, IconDocument, IconClipboard } from "../components/icons";
+import {
+  IconBuilding,
+  IconTag,
+  IconMapPin,
+  IconDocument,
+  IconClipboard,
+} from "../components/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -190,6 +196,26 @@ export default async function MyWorkspacePage({
                   </div>
                 )}
 
+                {entry.rfqs.length > 0 && (
+                  <div className="hub-card-docs">
+                    <span className="hub-card-docs-heading">
+                      <IconClipboard className="meta-icon" />
+                      {entry.rfqs.length} request{entry.rfqs.length > 1 ? "s" : ""} for quotation
+                    </span>
+                    <ul className="hub-doc-list">
+                      {entry.rfqs.slice(0, 3).map((rfq) => (
+                        <li key={rfq.id}>
+                          <a href={`/rfq?tender=${tender.id}&id=${rfq.id}`}>
+                            {rfq.title}
+                            {rfq.recipientName ? ` · ${rfq.recipientName}` : ""}
+                          </a>
+                          <span className="hub-doc-meta">Saved {formatDate(rfq.updatedAt)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
                 {entry.notes && (
                   <p className="hub-card-note">
                     {entry.notes.length > 140 ? `${entry.notes.slice(0, 140)}…` : entry.notes}
@@ -202,6 +228,9 @@ export default async function MyWorkspacePage({
                   </a>
                   <a href={`/fill?tender=${tender.id}`} className="btn">
                     {entry.docs.length > 0 ? "Resume documents" : "Fill documents"}
+                  </a>
+                  <a href={`/rfq?tender=${tender.id}`} className="btn">
+                    {entry.rfqs.length > 0 ? "New quote request" : "Request quotes"}
                   </a>
                   <a href={`/tenders/${tender.id}`} className="hub-view-link">
                     View tender &rarr;
