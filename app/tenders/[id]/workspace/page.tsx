@@ -55,19 +55,34 @@ export default async function WorkspacePage({ params }: { params: Promise<{ id: 
     updatedOn: formatDate(f.updated_at),
   }));
 
+  // Requests for quotation the user has already started for this tender.
+  const { data: savedRfqRows } = await supabase
+    .from("rfqs")
+    .select("id, title, recipient_name, updated_at")
+    .eq("user_id", user?.id ?? "")
+    .eq("tender_id", id)
+    .order("updated_at", { ascending: false })
+    .returns<{ id: string; title: string; recipient_name: string | null; updated_at: string }[]>();
+  const savedRfqs = savedRfqRows ?? [];
+
   return (
     <main>
       <nav className="page-nav">
         <a href={`/tenders/${id}`}>&larr; Back to tender</a>
-        <a href={`/fill?tender=${id}`} className="page-nav-cta">
-          Fill documents
-        </a>
+        <span className="page-nav-actions">
+          <a href={`/rfq?tender=${id}`} className="page-nav-cta secondary">
+            Request quotes
+          </a>
+          <a href={`/fill?tender=${id}`} className="page-nav-cta">
+            Fill documents
+          </a>
+        </span>
       </nav>
 
       <h1>Bid workspace</h1>
       <p className="subtitle">
         {tender.title}
-        {tender.buyer_name ? ` — ${tender.buyer_name}` : ""}
+        {tender.buyer_name ? ` · ${tender.buyer_name}` : ""}
       </p>
 
       {closing && (
@@ -99,6 +114,35 @@ export default async function WorkspacePage({ params }: { params: Promise<{ id: 
           </ul>
         </section>
       )}
+
+      <section className="workspace-group">
+        <div className="workspace-group-heading-row">
+          <h3 className="workspace-group-heading">Requests for quotation</h3>
+          <a href={`/rfq?tender=${id}`} className="workspace-add-link">
+            + New RFQ
+          </a>
+        </div>
+        {savedRfqs.length > 0 ? (
+          <ul className="workspace-started">
+            {savedRfqs.map((r) => (
+              <li key={r.id}>
+                <a href={`/rfq?tender=${id}&id=${r.id}`} className="workspace-started-link">
+                  <span className="workspace-started-name">
+                    {r.title}
+                    {r.recipient_name ? ` · ${r.recipient_name}` : ""}
+                  </span>
+                  <span className="workspace-started-meta">Saved {formatDate(r.updated_at)} · Resume</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="hub-card-hint">
+            Need pricing from suppliers before you bid? Build a request for quotation with your
+            item list and send it out.
+          </p>
+        )}
+      </section>
 
       <BidWorkspace
         tenderId={id}
