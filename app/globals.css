@@ -2177,11 +2177,7 @@ button:hover,
 }
 
 .rfq-qty-input {
-  width: 60px !important;
-}
-
-.rfq-unit-input {
-  width: 80px !important;
+  width: 70px !important;
 }
 
 .rfq-remove-row {
