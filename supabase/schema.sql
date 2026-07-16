@@ -141,11 +141,14 @@ create table if not exists rfqs (
 
 create index if not exists idx_rfqs_user_id on rfqs (user_id);
 
--- Matches: which tenders matched which profile
+-- Matches: which tenders matched which profile. profile_id is nullable so a
+-- tender can also be manually saved straight from Browse, with no profile
+-- behind it — user_id is the real ownership column either way.
 create table if not exists tender_matches (
   id uuid primary key default gen_random_uuid(),
   tender_id uuid references tenders(id) on delete cascade,
   profile_id uuid references matching_profiles(id) on delete cascade,
+  user_id uuid references auth.users(id) on delete cascade,
   match_score numeric,
   status text default 'new',          -- 'new' | 'saved' | 'dismissed' | 'applied'
   notified_at timestamptz,
@@ -153,6 +156,16 @@ create table if not exists tender_matches (
   created_at timestamptz default now(),
   unique (tender_id, profile_id)
 );
+
+alter table tender_matches add column if not exists user_id uuid references auth.users(id) on delete cascade;
+create index if not exists idx_tender_matches_user_id on tender_matches (user_id);
+
+-- Backfill user_id on existing rows from their owning profile, before the
+-- RLS policy below switches to relying on user_id directly.
+update tender_matches tm
+set user_id = mp.user_id
+from matching_profiles mp
+where tm.profile_id = mp.id and tm.user_id is null;
 
 -- Drafted response narratives (Claude-generated cover letter / EOI text).
 -- One draft per tender — regenerating overwrites the previous draft.
@@ -248,26 +261,15 @@ create policy "Users manage their own document fills"
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
--- tender_matches has no user_id of its own — ownership flows through the
--- owning matching_profiles row.
+-- tender_matches: ownership is user_id directly (works for both
+-- profile-scored matches and manually-saved ones, which have no profile).
 drop policy if exists "Users manage matches for their own profiles" on tender_matches;
-create policy "Users manage matches for their own profiles"
+drop policy if exists "Users manage their own tender matches" on tender_matches;
+create policy "Users manage their own tender matches"
   on tender_matches for all
   to authenticated
-  using (
-    exists (
-      select 1 from matching_profiles
-      where matching_profiles.id = tender_matches.profile_id
-      and matching_profiles.user_id = auth.uid()
-    )
-  )
-  with check (
-    exists (
-      select 1 from matching_profiles
-      where matching_profiles.id = tender_matches.profile_id
-      and matching_profiles.user_id = auth.uid()
-    )
-  );
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
 
 -- tender_drafts: no policy for the authenticated role — this feature is
 -- dormant (hidden UI, deferred to v2 per the project brief), so it stays

@@ -1,23 +1,14 @@
-import { getSupabaseAuthClient } from "@/lib/supabase-auth";
+import { getSupabaseAuthClient, getCurrentUser } from "@/lib/supabase-auth";
 import { IconBuilding, IconTag, IconMapPin, IconCalendar } from "../components/icons";
 import { formatDate, formatValue } from "@/lib/format";
+import { SA_PROVINCES } from "@/lib/provinces";
+import { saveTenderFromBrowse } from "../actions";
 
 export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 20;
 
-const SA_PROVINCES = [
-  "Eastern Cape",
-  "Free State",
-  "Gauteng",
-  "KwaZulu-Natal",
-  "Limpopo",
-  "Mpumalanga",
-  "North West",
-  "Northern Cape",
-  "Western Cape",
-  "National",
-];
+const BROWSE_PROVINCES = [...SA_PROVINCES, "National"];
 
 interface TenderRow {
   id: string;
@@ -109,6 +100,29 @@ export default async function BrowsePage({
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const tenders = data ?? [];
 
+  // So "back" from a tender detail page returns to this exact search/page.
+  const currentBrowseUrl = (() => {
+    const qs = new URLSearchParams();
+    if (q) qs.set("q", q);
+    if (province) qs.set("province", province);
+    if (page > 1) qs.set("page", String(page));
+    const query = qs.toString();
+    return query ? `/browse?${query}` : "/browse";
+  })();
+
+  const user = await getCurrentUser();
+  const tenderIds = tenders.map((t) => t.id);
+  const { data: myMatches } =
+    tenderIds.length && user
+      ? await supabase
+          .from("tender_matches")
+          .select("tender_id, status")
+          .eq("user_id", user.id)
+          .in("tender_id", tenderIds)
+          .returns<{ tender_id: string; status: string }[]>()
+      : { data: [] as { tender_id: string; status: string }[] };
+  const statusByTender = new Map((myMatches ?? []).map((m) => [m.tender_id, m.status]));
+
   return (
     <main>
       <h1>Browse tenders</h1>
@@ -126,7 +140,7 @@ export default async function BrowsePage({
         />
         <select name="province" defaultValue={province} aria-label="Province">
           <option value="">All provinces</option>
-          {SA_PROVINCES.map((p) => (
+          {BROWSE_PROVINCES.map((p) => (
             <option key={p} value={p}>
               {p}
             </option>
@@ -149,38 +163,56 @@ export default async function BrowsePage({
         <p className="empty-state">No open tenders match this search.</p>
       )}
 
-      {tenders.map((tender) => (
-        <article className="match-card" key={tender.id}>
-          <div className="match-card-header">
-            <div>
-              <h3 className="match-title">
-                <a href={`/tenders/${tender.id}`}>{tender.title}</a>
-              </h3>
-              <div className="match-meta">
-                <span className="meta-item">
-                  <IconBuilding className="meta-icon" />
-                  {tender.buyer_name ?? "Unknown buyer"}
-                </span>
-                <span className="meta-item">
-                  <IconTag className="meta-icon" />
-                  {tender.category ?? "Uncategorized"}
-                </span>
-                <span className="meta-item">
-                  <IconMapPin className="meta-icon" />
-                  {tender.province ?? "National"}
-                </span>
-                {tender.value_estimate != null && tender.value_estimate > 0 && (
-                  <span className="meta-item">{formatValue(tender.value_estimate, tender.currency)}</span>
-                )}
-                <span className="meta-item">
-                  <IconCalendar className="meta-icon" />
-                  Closes {formatDate(tender.closing_date)}
-                </span>
+      {tenders.map((tender) => {
+        const status = statusByTender.get(tender.id);
+        return (
+          <article className="match-card" key={tender.id}>
+            <div className="match-card-header">
+              <div>
+                <h3 className="match-title">
+                  <a href={`/tenders/${tender.id}?from=${encodeURIComponent(currentBrowseUrl)}`}>
+                    {tender.title}
+                  </a>
+                </h3>
+                <div className="match-meta">
+                  <span className="meta-item">
+                    <IconBuilding className="meta-icon" />
+                    {tender.buyer_name ?? "Unknown buyer"}
+                  </span>
+                  <span className="meta-item">
+                    <IconTag className="meta-icon" />
+                    {tender.category ?? "Uncategorized"}
+                  </span>
+                  <span className="meta-item">
+                    <IconMapPin className="meta-icon" />
+                    {tender.province ?? "National"}
+                  </span>
+                  {tender.value_estimate != null && tender.value_estimate > 0 && (
+                    <span className="meta-item">{formatValue(tender.value_estimate, tender.currency)}</span>
+                  )}
+                  <span className="meta-item">
+                    <IconCalendar className="meta-icon" />
+                    Closes {formatDate(tender.closing_date)}
+                  </span>
+                </div>
               </div>
+              {status && status !== "new" && (
+                <div className="badges">
+                  <span className={`badge status-${status}`}>{status}</span>
+                </div>
+              )}
             </div>
-          </div>
-        </article>
-      ))}
+
+            {status !== "saved" && status !== "applied" && (
+              <div className="match-actions">
+                <form action={saveTenderFromBrowse.bind(null, tender.id)}>
+                  <button type="submit">Save</button>
+                </form>
+              </div>
+            )}
+          </article>
+        );
+      })}
 
       <Pagination page={page} totalPages={totalPages} q={q} province={province} />
     </main>

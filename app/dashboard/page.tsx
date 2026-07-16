@@ -2,6 +2,8 @@ import { getSupabaseAuthClient, getCurrentUser } from "@/lib/supabase-auth";
 import { updateMatchStatus } from "../actions";
 import { IconBuilding, IconTag, IconMapPin, IconCalendar } from "../components/icons";
 import { formatDate, formatValue } from "@/lib/format";
+import { SA_PROVINCES } from "@/lib/provinces";
+import { ProvinceSelect } from "./ProvinceSelect";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +16,9 @@ const SORT_LABELS: Record<SortOption, string> = {
   score: "Best match",
   closing: "Closing soonest",
 };
+
+const PROVINCE_FILTERS = ["all", ...SA_PROVINCES] as const;
+type ProvinceFilter = (typeof PROVINCE_FILTERS)[number];
 
 const PAGE_SIZE = 20;
 
@@ -71,11 +76,13 @@ function Pagination({
   totalPages,
   statusFilter,
   sortOption,
+  provinceFilter,
 }: {
   page: number;
   totalPages: number;
   statusFilter: StatusFilter;
   sortOption: SortOption;
+  provinceFilter: ProvinceFilter;
 }) {
   if (totalPages <= 1) return null;
 
@@ -83,6 +90,7 @@ function Pagination({
     const qs = new URLSearchParams();
     if (statusFilter !== "all") qs.set("status", statusFilter);
     if (sortOption !== "score") qs.set("sort", sortOption);
+    if (provinceFilter !== "all") qs.set("province", provinceFilter);
     if (p > 1) qs.set("page", String(p));
     const query = qs.toString();
     return query ? `/dashboard?${query}` : "/dashboard";
@@ -144,7 +152,7 @@ function RunBanner({ run }: { run: IngestionRun | null }) {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; page?: string; sort?: string }>;
+  searchParams: Promise<{ status?: string; page?: string; sort?: string; province?: string }>;
 }) {
   const params = await searchParams;
   const statusFilter: StatusFilter = STATUS_FILTERS.includes(params.status as StatusFilter)
@@ -153,17 +161,34 @@ export default async function DashboardPage({
   const sortOption: SortOption = SORT_OPTIONS.includes(params.sort as SortOption)
     ? (params.sort as SortOption)
     : "score";
+  const provinceFilter: ProvinceFilter = PROVINCE_FILTERS.includes(params.province as ProvinceFilter)
+    ? (params.province as ProvinceFilter)
+    : "all";
   const page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
 
-  const hrefFor = (overrides: { status?: StatusFilter; sort?: SortOption }) => {
+  const hrefFor = (overrides: { status?: StatusFilter; sort?: SortOption; province?: ProvinceFilter }) => {
     const nextStatus = overrides.status ?? statusFilter;
     const nextSort = overrides.sort ?? sortOption;
+    const nextProvince = overrides.province ?? provinceFilter;
     const qs = new URLSearchParams();
     if (nextStatus !== "all") qs.set("status", nextStatus);
     if (nextSort !== "score") qs.set("sort", nextSort);
+    if (nextProvince !== "all") qs.set("province", nextProvince);
     const query = qs.toString();
     return query ? `/dashboard?${query}` : "/dashboard";
   };
+
+  // Carries pagination too, so "back to dashboard" from a tender returns to
+  // the exact page the user was on, not just the filters.
+  const currentDashboardUrl = (() => {
+    const qs = new URLSearchParams();
+    if (statusFilter !== "all") qs.set("status", statusFilter);
+    if (sortOption !== "score") qs.set("sort", sortOption);
+    if (provinceFilter !== "all") qs.set("province", provinceFilter);
+    if (page > 1) qs.set("page", String(page));
+    const query = qs.toString();
+    return query ? `/dashboard?${query}` : "/dashboard";
+  })();
 
   const user = await getCurrentUser();
   const userId = user?.id ?? "";
@@ -194,9 +219,9 @@ export default async function DashboardPage({
   const { data: allMatches, error } = await supabase
     .from("tender_matches")
     .select(
-      "id, match_score, status, viewed_at, tenders!inner(id, title, buyer_name, category, province, value_estimate, currency, closing_date), matching_profiles!inner(name, user_id)"
+      "id, match_score, status, viewed_at, tenders!inner(id, title, buyer_name, category, province, value_estimate, currency, closing_date), matching_profiles(name)"
     )
-    .eq("matching_profiles.user_id", userId)
+    .eq("user_id", userId)
     .order("match_score", { ascending: false })
     .returns<MatchRow[]>();
 
@@ -210,9 +235,11 @@ export default async function DashboardPage({
       return acc;
     }, {});
 
-  // Visible list: apply the status tab + the closing-date expiry rule.
+  // Visible list: apply the status tab, province filter, and the
+  // closing-date expiry rule.
   const visibleMatches = all.filter((match) => {
     if (isExpiredAndUnreviewed(match.status, match.tenders?.closing_date)) return false;
+    if (provinceFilter !== "all" && match.tenders?.province !== provinceFilter) return false;
     return statusFilter === "all" ? match.status !== "dismissed" : match.status === statusFilter;
   });
 
@@ -263,6 +290,15 @@ export default async function DashboardPage({
             </a>
           ))}
         </nav>
+
+        <ProvinceSelect
+          current={provinceFilter}
+          options={PROVINCE_FILTERS.map((p) => ({
+            value: p,
+            label: p === "all" ? "All provinces" : p,
+            href: hrefFor({ province: p }),
+          }))}
+        />
       </div>
 
       {error && <p className="empty-state">Failed to load matches: {error.message}</p>}
@@ -280,7 +316,9 @@ export default async function DashboardPage({
             <div className="match-card-header">
               <div>
                 <h3 className="match-title">
-                  <a href={`/tenders/${tender.id}`}>{tender.title}</a>
+                  <a href={`/tenders/${tender.id}?from=${encodeURIComponent(currentDashboardUrl)}`}>
+                    {tender.title}
+                  </a>
                 </h3>
                 <div className="match-meta">
                   <span className="meta-item">
@@ -334,7 +372,13 @@ export default async function DashboardPage({
         );
       })}
 
-      <Pagination page={page} totalPages={totalPages} statusFilter={statusFilter} sortOption={sortOption} />
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        statusFilter={statusFilter}
+        sortOption={sortOption}
+        provinceFilter={provinceFilter}
+      />
     </main>
   );
 }

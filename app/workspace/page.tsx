@@ -54,6 +54,11 @@ export default async function MyWorkspacePage({
 
   const visible = sortWorkspaceEntries(entries.filter((e) => matchesTab(e, tab)));
 
+  // So "back" from a tender detail page returns to this exact tab.
+  const currentWorkspaceUrl = tab === "all" ? "/workspace" : `/workspace?tab=${tab}`;
+  const tenderHref = (tenderId: string) =>
+    `/tenders/${tenderId}?from=${encodeURIComponent(currentWorkspaceUrl)}`;
+
   return (
     <main>
       <h1>My workspace</h1>
@@ -121,7 +126,7 @@ export default async function MyWorkspacePage({
                 <div className="hub-card-top">
                   <div>
                     <h3 className="hub-card-title">
-                      <a href={`/tenders/${tender.id}`}>{tender.title}</a>
+                      <a href={tenderHref(tender.id)}>{tender.title}</a>
                     </h3>
                     <div className="match-meta">
                       <span className="meta-item">
@@ -232,7 +237,7 @@ export default async function MyWorkspacePage({
                   <a href={`/rfq?tender=${tender.id}`} className="btn">
                     {entry.rfqs.length > 0 ? "New quote request" : "Request quotes"}
                   </a>
-                  <a href={`/tenders/${tender.id}`} className="hub-view-link">
+                  <a href={tenderHref(tender.id)} className="hub-view-link">
                     View tender &rarr;
                   </a>
                 </div>
