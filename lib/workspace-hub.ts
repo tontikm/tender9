@@ -94,8 +94,8 @@ export async function getWorkspaceEntries(
       .returns<RfqRow[]>(),
     supabase
       .from("tender_matches")
-      .select("tender_id, status, matching_profiles!inner(user_id)")
-      .eq("matching_profiles.user_id", userId)
+      .select("tender_id, status")
+      .eq("user_id", userId)
       .in("status", ["saved", "applied"])
       .returns<MatchRow[]>(),
   ]);

@@ -1,19 +1,8 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
-import { saveProfile, deleteProfile, type SaveProfileState } from "./actions";
-
-const SA_PROVINCES = [
-  "Eastern Cape",
-  "Free State",
-  "Gauteng",
-  "KwaZulu-Natal",
-  "Limpopo",
-  "Mpumalanga",
-  "North West",
-  "Northern Cape",
-  "Western Cape",
-];
+import { useActionState, useEffect, useState, useTransition } from "react";
+import { saveProfile, deleteProfile, setProfileActive, type SaveProfileState } from "./actions";
+import { SA_PROVINCES } from "@/lib/provinces";
 
 export interface Profile {
   id: string;
@@ -187,26 +176,50 @@ function ExistingProfileRow({
   availableCategories: string[];
 }) {
   const [editing, setEditing] = useState(false);
+  const [active, setActive] = useState(profile.active);
+  const [pending, startTransition] = useTransition();
+
+  const toggleActive = () => {
+    const next = !active;
+    setActive(next);
+    startTransition(async () => {
+      try {
+        await setProfileActive(profile.id, next);
+      } catch {
+        setActive(!next);
+      }
+    });
+  };
 
   return (
-    <article className={`profile-card ${profile.active ? "" : "inactive"}`}>
+    <article className={`profile-card ${active ? "" : "inactive"}`}>
       {editing ? (
         <ProfileEditor
-          profile={profile}
+          profile={{ ...profile, active }}
           availableCategories={availableCategories}
           onDone={() => setEditing(false)}
         />
       ) : (
-        <button type="button" className="profile-summary" onClick={() => setEditing(true)}>
-          <span className="profile-summary-main">
+        <div className="profile-summary">
+          <button type="button" className="profile-summary-main" onClick={() => setEditing(true)}>
             <span className="profile-summary-name">{profile.name}</span>
             <span className="profile-summary-meta">{summarize(profile)}</span>
-          </span>
+          </button>
           <span className="profile-summary-actions">
-            {!profile.active && <span className="badge status-dismissed">Inactive</span>}
-            <span className="profile-summary-edit">Edit</span>
+            <label
+              className="profile-toggle"
+              title={active ? "On — contributing matches" : "Off — not matched against tenders"}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <input type="checkbox" checked={active} disabled={pending} onChange={toggleActive} />
+              <span className="profile-toggle-track" />
+              <span className="profile-toggle-label">{active ? "On" : "Off"}</span>
+            </label>
+            <button type="button" className="profile-summary-edit" onClick={() => setEditing(true)}>
+              Edit
+            </button>
           </span>
-        </button>
+        </div>
       )}
     </article>
   );

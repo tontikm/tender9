@@ -556,6 +556,21 @@ h1 {
   border-color: var(--color-text);
 }
 
+.province-select {
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  cursor: pointer;
+}
+
+.province-select:hover {
+  border-color: var(--color-border-strong);
+}
+
 /* ---------- Match cards ---------- */
 
 .match-card {
@@ -1521,15 +1536,6 @@ button:hover,
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  text-align: left;
-}
-
-.profile-summary:hover {
-  background: transparent;
 }
 
 .profile-summary-main {
@@ -1537,6 +1543,15 @@ button:hover,
   flex-direction: column;
   gap: 4px;
   min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.profile-summary-main:hover .profile-summary-name {
+  color: var(--color-primary);
 }
 
 .profile-summary-name {
@@ -1561,10 +1576,71 @@ button:hover,
   font-size: 13px;
   font-weight: 500;
   color: var(--color-primary);
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
 }
 
-.profile-summary:hover .profile-summary-edit {
+.profile-summary-edit:hover {
   text-decoration: underline;
+}
+
+.profile-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.profile-toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.profile-toggle-track {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  border-radius: var(--radius-pill);
+  background: var(--color-neutral-border);
+  transition: background-color 0.15s ease;
+  flex-shrink: 0;
+}
+
+.profile-toggle-track::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.15s ease;
+}
+
+.profile-toggle input:checked + .profile-toggle-track {
+  background: var(--color-primary);
+}
+
+.profile-toggle input:checked + .profile-toggle-track::before {
+  transform: translateX(14px);
+}
+
+.profile-toggle input:focus-visible + .profile-toggle-track {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.profile-toggle-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  min-width: 20px;
 }
 
 .add-profile-button {

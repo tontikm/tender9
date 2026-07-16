@@ -2,6 +2,7 @@ import { getSupabaseServerClient } from "./supabase";
 
 interface MatchingProfile {
   id: string;
+  user_id: string;
   name: string;
   keywords: string[] | null;
   categories: string[] | null;
@@ -107,6 +108,7 @@ export async function matchTenders(tenderIds: string[]): Promise<number> {
   const matchesToInsert: {
     tender_id: string;
     profile_id: string;
+    user_id: string;
     match_score: number;
   }[] = [];
 
@@ -123,6 +125,7 @@ export async function matchTenders(tenderIds: string[]): Promise<number> {
         matchesToInsert.push({
           tender_id: tenderRow.id,
           profile_id: profile.id,
+          user_id: profile.user_id,
           match_score: score,
         });
       }

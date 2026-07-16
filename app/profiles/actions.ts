@@ -73,6 +73,28 @@ export async function saveProfile(
   return { ok: true, error: null };
 }
 
+// A quick on/off switch on the profile list, separate from the full edit
+// form — lets a user toggle which profiles are actually contributing
+// matches without opening each one.
+export async function setProfileActive(id: string, active: boolean) {
+  const user = await getCurrentUser();
+  if (!user) throw new Error("Not signed in");
+
+  const supabase = await getSupabaseAuthClient();
+  const { error } = await supabase
+    .from("matching_profiles")
+    .update({ active })
+    .eq("id", id)
+    .eq("user_id", user.id);
+
+  if (error) throw error;
+
+  await rematchAllTenders();
+
+  revalidatePath("/profiles");
+  revalidatePath("/dashboard");
+}
+
 export async function deleteProfile(id: string) {
   const user = await getCurrentUser();
   if (!user) throw new Error("Not signed in");

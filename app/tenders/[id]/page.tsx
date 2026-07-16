@@ -41,12 +41,25 @@ interface MatchRow {
 
 export default async function TenderDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string }>;
 }) {
   const { id } = await params;
+  const { from } = await searchParams;
   const user = await getCurrentUser();
   const supabase = await getSupabaseAuthClient();
+
+  // Wherever the user actually came from (dashboard, browse, or my
+  // workspace), so "back"/"dismiss" return them there instead of always
+  // landing on the dashboard.
+  const backHref = from && from.startsWith("/") && !from.startsWith("//") ? from : "/dashboard";
+  const backLabel = from?.startsWith("/browse")
+    ? "Back to browse"
+    : from?.startsWith("/workspace")
+      ? "Back to my workspace"
+      : "Back to matched tenders";
 
   const { data: tender } = await supabase
     .from("tenders")
@@ -73,9 +86,9 @@ export default async function TenderDetailPage({
 
   const { data: matches } = await supabase
     .from("tender_matches")
-    .select("id, match_score, status, matching_profiles!inner(name, user_id)")
+    .select("id, match_score, status, matching_profiles(name)")
     .eq("tender_id", id)
-    .eq("matching_profiles.user_id", user?.id ?? "")
+    .eq("user_id", user?.id ?? "")
     .order("match_score", { ascending: false })
     .returns<MatchRow[]>();
 
@@ -92,7 +105,7 @@ export default async function TenderDetailPage({
   return (
     <main>
       <nav className="page-nav">
-        <a href="/dashboard">&larr; Back to matched tenders</a>
+        <a href={backHref}>&larr; {backLabel}</a>
         <span className="page-nav-actions">
           <a href={`/tenders/${tender.id}/workspace`} className="page-nav-cta secondary">
             Bid workspace
@@ -259,7 +272,9 @@ export default async function TenderDetailPage({
               <div className="detail-match-header">
                 <div>
                   <p className="match-meta">
-                    <span className="meta-item">Profile: {match.matching_profiles?.name ?? "Unknown"}</span>
+                    <span className="meta-item">
+                      {match.matching_profiles?.name ? `Profile: ${match.matching_profiles.name}` : "Manually saved"}
+                    </span>
                   </p>
                 </div>
                 <div className="badges">
@@ -281,7 +296,7 @@ export default async function TenderDetailPage({
                     </form>
                   )}
                   <form
-                    action={dismissMatchAndReturn.bind(null, match.id)}
+                    action={dismissMatchAndReturn.bind(null, match.id, backHref)}
                     className="dismiss-button"
                   >
                     <button type="submit">Dismiss</button>
