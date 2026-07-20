@@ -194,13 +194,6 @@ export default async function DashboardPage({
   const userId = user?.id ?? "";
   const supabase = await getSupabaseAuthClient();
 
-  const { data: lastRun } = await supabase
-    .from("ingestion_runs")
-    .select("status, started_at, finished_at, records_fetched, records_new, records_updated, error_message")
-    .order("started_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
   // PostgREST can't express "status IN (saved, applied) OR tenders.closing_date
   // >= now" as a single query (mixing a parent-table and embedded-table
   // condition in one OR isn't supported), so fetch the status-filtered set
@@ -212,18 +205,27 @@ export default async function DashboardPage({
     return !!closingDate && closingDate < nowIso;
   };
 
-  // Fetch the user's matches once, selecting only the columns the dashboard
-  // renders — NOT tenders(*), which would drag in the large raw_payload JSON
-  // for every row. All filtering/sorting/paging/counting is then done in app
-  // code (match counts per user are in the dozens).
-  const { data: allMatches, error } = await supabase
-    .from("tender_matches")
-    .select(
-      "id, match_score, status, viewed_at, tenders!inner(id, title, buyer_name, category, province, value_estimate, currency, closing_date), matching_profiles(name)"
-    )
-    .eq("user_id", userId)
-    .order("match_score", { ascending: false })
-    .returns<MatchRow[]>();
+  // Run both reads in parallel — the ingestion-run banner and the match list
+  // are independent, so there's no reason to pay two serial round-trips.
+  // Matches select only the columns the dashboard renders — NOT tenders(*),
+  // which would drag in the large raw_payload JSON per row. All
+  // filtering/sorting/paging/counting is then done in app code.
+  const [{ data: lastRun }, { data: allMatches, error }] = await Promise.all([
+    supabase
+      .from("ingestion_runs")
+      .select("status, started_at, finished_at, records_fetched, records_new, records_updated, error_message")
+      .order("started_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("tender_matches")
+      .select(
+        "id, match_score, status, viewed_at, tenders!inner(id, title, buyer_name, category, province, value_estimate, currency, closing_date), matching_profiles(name)"
+      )
+      .eq("user_id", userId)
+      .order("match_score", { ascending: false })
+      .returns<MatchRow[]>(),
+  ]);
 
   const all = allMatches ?? [];
 
