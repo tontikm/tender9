@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
@@ -8,8 +9,12 @@ import { cookies } from "next/headers";
  * ingestion_runs — since RLS policies key off auth.uid() from this client's
  * JWT. lib/supabase.ts's service-role client bypasses RLS entirely and is
  * reserved for the ingestion cron and cross-tenant matching logic.
+ *
+ * Wrapped in React cache() so a single request render (e.g. the Header plus
+ * the page component) reuses one client instead of re-reading cookies and
+ * constructing a fresh client per call.
  */
-export async function getSupabaseAuthClient() {
+export const getSupabaseAuthClient = cache(async () => {
   const cookieStore = await cookies();
 
   return createServerClient(
@@ -31,12 +36,18 @@ export async function getSupabaseAuthClient() {
       },
     }
   );
-}
+});
 
-export async function getCurrentUser() {
+/**
+ * The current signed-in user. Validating the JWT is a network round-trip to
+ * Supabase Auth (~300-700ms), and this is called from both the Header and
+ * every page — so it's wrapped in React cache() to collapse those into a
+ * single call per request render.
+ */
+export const getCurrentUser = cache(async () => {
   const supabase = await getSupabaseAuthClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   return user;
-}
+});

@@ -73,8 +73,11 @@ export default async function BrowsePage({
 
   let query = supabase
     .from("tenders")
+    // "planned" uses the query planner's row estimate instead of a full
+    // COUNT scan — roughly a second faster on ~1000 open tenders, and an
+    // approximate total is fine for a browse pager.
     .select("id, title, buyer_name, category, province, value_estimate, currency, closing_date", {
-      count: "exact",
+      count: "planned",
     })
     .gte("closing_date", nowIso);
 

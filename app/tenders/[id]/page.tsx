@@ -61,46 +61,50 @@ export default async function TenderDetailPage({
       ? "Back to my workspace"
       : "Back to matched tenders";
 
-  const { data: tender } = await supabase
-    .from("tenders")
-    .select(
-      "id, title, description, buyer_name, category, province, value_estimate, currency, status, closing_date, briefing_date, published_date, document_urls, raw_payload"
-    )
-    .eq("id", id)
-    .maybeSingle<Tender>();
+  // Fire all of this tender's reads (plus the fire-and-forget viewed_at
+  // stamp) in parallel instead of one sequential round-trip after another —
+  // the auth latency to Supabase makes serial awaits the main page cost.
+  // If the tender doesn't exist we notFound() below; the couple of parallel
+  // queries we then discard cost nothing extra since they already ran.
+  const userId = user?.id ?? "";
+  const [{ data: tender }, { data: savedFillRows }, { data: matches }] = await Promise.all([
+    supabase
+      .from("tenders")
+      .select(
+        "id, title, description, buyer_name, category, province, value_estimate, currency, status, closing_date, briefing_date, published_date, document_urls, raw_payload"
+      )
+      .eq("id", id)
+      .maybeSingle<Tender>(),
+    supabase
+      .from("document_fills")
+      .select("doc_key")
+      .eq("user_id", userId)
+      .eq("tender_id", id)
+      .returns<{ doc_key: string }[]>(),
+    supabase
+      .from("tender_matches")
+      .select("id, match_score, status, matching_profiles(name)")
+      .eq("tender_id", id)
+      .eq("user_id", userId)
+      .order("match_score", { ascending: false })
+      .returns<MatchRow[]>(),
+    // Mark this tender as viewed the first time the user opens it, so the
+    // dashboard can show which tenders they've already looked at. RLS scopes
+    // the update to the user's own matches; `.is("viewed_at", null)` means
+    // only the first view is recorded and re-visits don't overwrite it.
+    supabase
+      .from("tender_matches")
+      .update({ viewed_at: new Date().toISOString() })
+      .eq("tender_id", id)
+      .is("viewed_at", null),
+  ]);
 
   if (!tender) notFound();
 
   const requirements = extractRequirements(tender.raw_payload);
-
-  // Which of this tender's documents does the user have an in-progress fill for?
-  const { data: savedFillRows } = await supabase
-    .from("document_fills")
-    .select("doc_key")
-    .eq("user_id", user?.id ?? "")
-    .eq("tender_id", id)
-    .returns<{ doc_key: string }[]>();
   const savedDocIndexes = (savedFillRows ?? [])
     .map((r) => Number.parseInt(r.doc_key.split(":")[2] ?? "", 10))
     .filter((n) => Number.isInteger(n));
-
-  const { data: matches } = await supabase
-    .from("tender_matches")
-    .select("id, match_score, status, matching_profiles(name)")
-    .eq("tender_id", id)
-    .eq("user_id", user?.id ?? "")
-    .order("match_score", { ascending: false })
-    .returns<MatchRow[]>();
-
-  // Mark this tender as viewed for the current user the first time they open
-  // it, so the dashboard can show which tenders they've already looked at.
-  // RLS scopes the update to the user's own matches; `.is("viewed_at", null)`
-  // means only the first view is recorded and re-visits don't overwrite it.
-  await supabase
-    .from("tender_matches")
-    .update({ viewed_at: new Date().toISOString() })
-    .eq("tender_id", id)
-    .is("viewed_at", null);
 
   return (
     <main>
