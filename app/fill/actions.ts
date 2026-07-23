@@ -1,6 +1,7 @@
 "use server";
 
 import { getSupabaseAuthClient, getCurrentUser } from "@/lib/supabase-auth";
+import { checkBase64Size, MAX_FILL_PDF_BYTES } from "@/lib/limits";
 
 export interface SaveFillResult {
   ok: boolean;
@@ -26,6 +27,11 @@ export async function saveFill(input: {
 }): Promise<SaveFillResult> {
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "Not signed in" };
+
+  if (input.pdfBase64) {
+    const sizeError = checkBase64Size(input.pdfBase64, MAX_FILL_PDF_BYTES, "This document");
+    if (sizeError) return { ok: false, error: sizeError };
+  }
 
   const supabase = await getSupabaseAuthClient();
   const { error } = await supabase.from("document_fills").upsert(
@@ -67,9 +73,11 @@ export async function loadFill(docKey: string): Promise<LoadedFill | null> {
   };
 }
 
-export async function deleteFill(docKey: string): Promise<void> {
+export async function deleteFill(docKey: string): Promise<SaveFillResult> {
   const user = await getCurrentUser();
-  if (!user) return;
+  if (!user) return { ok: false, error: "Not signed in" };
   const supabase = await getSupabaseAuthClient();
-  await supabase.from("document_fills").delete().eq("user_id", user.id).eq("doc_key", docKey);
+  const { error } = await supabase.from("document_fills").delete().eq("user_id", user.id).eq("doc_key", docKey);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, error: null };
 }

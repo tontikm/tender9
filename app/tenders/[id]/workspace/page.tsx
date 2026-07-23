@@ -23,46 +23,42 @@ export default async function WorkspacePage({ params }: { params: Promise<{ id: 
   const user = await getCurrentUser();
   const supabase = await getSupabaseAuthClient();
 
-  const [{ data: tender }, { data: workspace }] = await Promise.all([
-    supabase
-      .from("tenders")
-      .select("id, title, buyer_name, closing_date")
-      .eq("id", id)
-      .maybeSingle<TenderRow>(),
+  const userId = user?.id ?? "";
+
+  const [{ data: tender }, { data: workspace }, { data: savedFills }, { data: savedRfqRows }] = await Promise.all([
+    supabase.from("tenders").select("id, title, buyer_name, closing_date").eq("id", id).maybeSingle<TenderRow>(),
     supabase
       .from("bid_workspaces")
       .select("checklist, notes")
       .eq("tender_id", id)
-      .eq("user_id", user?.id ?? "")
+      .eq("user_id", userId)
       .maybeSingle<WorkspaceRow>(),
+    // In-progress fills the user has saved for this tender's documents.
+    supabase
+      .from("document_fills")
+      .select("doc_key, doc_name, updated_at")
+      .eq("user_id", userId)
+      .eq("tender_id", id)
+      .order("updated_at", { ascending: false })
+      .returns<{ doc_key: string; doc_name: string; updated_at: string }[]>(),
+    // Requests for quotation the user has already started for this tender.
+    supabase
+      .from("rfqs")
+      .select("id, title, recipient_name, updated_at")
+      .eq("user_id", userId)
+      .eq("tender_id", id)
+      .order("updated_at", { ascending: false })
+      .returns<{ id: string; title: string; recipient_name: string | null; updated_at: string }[]>(),
   ]);
 
   if (!tender) notFound();
 
   const closing = closingInfo(tender.closing_date);
-
-  // In-progress fills the user has saved for this tender's documents.
-  const { data: savedFills } = await supabase
-    .from("document_fills")
-    .select("doc_key, doc_name, updated_at")
-    .eq("user_id", user?.id ?? "")
-    .eq("tender_id", id)
-    .order("updated_at", { ascending: false })
-    .returns<{ doc_key: string; doc_name: string; updated_at: string }[]>();
   const startedDocs = (savedFills ?? []).map((f) => ({
     docName: f.doc_name,
     docIndex: Number.parseInt(f.doc_key.split(":")[2] ?? "", 10),
     updatedOn: formatDate(f.updated_at),
   }));
-
-  // Requests for quotation the user has already started for this tender.
-  const { data: savedRfqRows } = await supabase
-    .from("rfqs")
-    .select("id, title, recipient_name, updated_at")
-    .eq("user_id", user?.id ?? "")
-    .eq("tender_id", id)
-    .order("updated_at", { ascending: false })
-    .returns<{ id: string; title: string; recipient_name: string | null; updated_at: string }[]>();
   const savedRfqs = savedRfqRows ?? [];
 
   return (

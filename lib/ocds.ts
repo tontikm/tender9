@@ -5,6 +5,8 @@
  *   https://ocds-api.etenders.gov.za/swagger/v1/swagger.json
  */
 
+import { z } from "zod";
+
 const OCDS_BASE_URL = "https://ocds-api.etenders.gov.za";
 
 const OCDS_RELEASES_PATH = "/api/OCDSReleases";
@@ -117,16 +119,62 @@ function isSentinelDate(value: unknown): boolean {
   return typeof value === "string" && value.startsWith("0001-01-01");
 }
 
+// Only the fields normalizeRelease actually reads — validated with zod
+// (rather than typed `any`) so an upstream shape change fails a single
+// release's parse loudly in the logs instead of silently reading `undefined`
+// three levels deep. Every field the API could plausibly omit is optional;
+// `.passthrough()` on each object means unrecognized/extra fields don't fail
+// validation, since the untouched original is what's actually stored (see
+// raw_payload below) — this only guards the paths we depend on.
+const OcdsPartySchema = z.object({ name: z.string().optional() }).passthrough();
+
+const OcdsDocumentSchema = z.object({ url: z.string().optional() }).passthrough();
+
+const OcdsTenderSchema = z
+  .object({
+    title: z.string().optional(),
+    description: z.string().nullable().optional(),
+    category: z.string().nullable().optional(),
+    mainProcurementCategory: z.string().nullable().optional(),
+    province: z.string().nullable().optional(),
+    value: z.object({ amount: z.number().nullable().optional(), currency: z.string().optional() }).passthrough().optional(),
+    status: z.string().nullable().optional(),
+    tenderPeriod: z.object({ endDate: z.string().nullable().optional() }).passthrough().optional(),
+    briefingSession: z
+      .object({ isSession: z.boolean().optional(), date: z.string().optional() })
+      .passthrough()
+      .optional(),
+    documents: z.array(OcdsDocumentSchema).optional(),
+  })
+  .passthrough();
+
+const OcdsReleaseSchema = z
+  .object({
+    ocid: z.string().optional(),
+    date: z.string().optional(),
+    tender: OcdsTenderSchema.optional(),
+    buyer: OcdsPartySchema.optional(),
+    parties: z.array(OcdsPartySchema).optional(),
+  })
+  .passthrough();
+
 /**
  * Maps a single OCDS release into our tenders table shape.
  * Field paths confirmed against the eTenders swagger ReleasePackage/Release/Tender schemas
  * (SA implementation adds category/province directly on tender, plus a briefingSession object).
  */
-export function normalizeRelease(release: any): NormalizedTender | null {
-  const tender = release?.tender;
+export function normalizeRelease(rawRelease: unknown): NormalizedTender | null {
+  const parsed = OcdsReleaseSchema.safeParse(rawRelease);
+  if (!parsed.success) {
+    console.warn("normalizeRelease: unexpected release shape, skipping", parsed.error.issues.slice(0, 3));
+    return null;
+  }
+  const release = parsed.data;
+
+  const tender = release.tender;
   if (!tender) return null;
 
-  const ocid: string | undefined = release.ocid;
+  const ocid = release.ocid;
   if (!ocid) return null;
 
   return {
@@ -143,12 +191,12 @@ export function normalizeRelease(release: any): NormalizedTender | null {
     closing_date: tender.tenderPeriod?.endDate ?? null,
     briefing_date:
       tender.briefingSession?.isSession && !isSentinelDate(tender.briefingSession?.date)
-        ? tender.briefingSession.date
+        ? (tender.briefingSession?.date ?? null)
         : null,
     published_date: release.date ?? null,
     document_urls: (tender.documents ?? [])
-      .map((d: any) => d.url)
-      .filter((url: unknown): url is string => typeof url === "string"),
-    raw_payload: release,
+      .map((d) => d.url)
+      .filter((url): url is string => typeof url === "string"),
+    raw_payload: rawRelease,
   };
 }

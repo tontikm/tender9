@@ -2,9 +2,10 @@ import { getSupabaseAuthClient, getCurrentUser } from "@/lib/supabase-auth";
 import { ProfilesManager, type Profile } from "./ProfilesManager";
 
 export const dynamic = "force-dynamic";
-// saveProfile/deleteProfile call rematchAllTenders(), which re-scores every
-// tender in the table — can take longer than Vercel's default function
-// timeout as the tenders table grows, same reasoning as api/ingest/route.ts.
+// saveProfile/setProfileActive run rematchAllTenders() after the response via
+// next/server's after(), which re-scores every tender in the table — this
+// keeps the function alive long enough for that background work to finish,
+// same reasoning as api/ingest/route.ts.
 export const maxDuration = 60;
 
 async function fetchDistinctCategories(
@@ -32,14 +33,16 @@ async function fetchDistinctCategories(
 export default async function ProfilesPage() {
   const user = await getCurrentUser();
   const supabase = await getSupabaseAuthClient();
-  const { data: profiles, error } = await supabase
-    .from("matching_profiles")
-    .select("*")
-    .eq("user_id", user?.id ?? "")
-    .order("created_at", { ascending: true })
-    .returns<Profile[]>();
 
-  const availableCategories = await fetchDistinctCategories(supabase);
+  const [{ data: profiles, error }, availableCategories] = await Promise.all([
+    supabase
+      .from("matching_profiles")
+      .select("*")
+      .eq("user_id", user?.id ?? "")
+      .order("created_at", { ascending: true })
+      .returns<Profile[]>(),
+    fetchDistinctCategories(supabase),
+  ]);
 
   return (
     <main>

@@ -52,21 +52,30 @@ export default async function FillPage({
   const params = await searchParams;
   const user = await getCurrentUser();
   const supabase = await getSupabaseAuthClient();
+  const userId = user?.id ?? "";
 
-  const { data: company } = await supabase
-    .from("company_profiles")
-    .select("*")
-    .eq("user_id", user?.id ?? "")
-    .maybeSingle<CompanyRow>();
+  interface TenderRow {
+    id: string;
+    title: string;
+    document_urls: string[] | null;
+  }
 
-  // Lightweight list of the user's saved in-progress fills (no bytes) so they
-  // can resume any of them. Full data is fetched on demand via loadFill().
-  const { data: savedRows } = await supabase
-    .from("document_fills")
-    .select("doc_key, doc_name, tender_id, updated_at")
-    .eq("user_id", user?.id ?? "")
-    .order("updated_at", { ascending: false })
-    .returns<{ doc_key: string; doc_name: string; tender_id: string | null; updated_at: string }[]>();
+  // Company details, the saved-fills list, and the tender's documents (when
+  // opened from a tender) are all independent reads — fetch them together.
+  const [{ data: company }, { data: savedRows }, { data: tender }] = await Promise.all([
+    supabase.from("company_profiles").select("*").eq("user_id", userId).maybeSingle<CompanyRow>(),
+    // Lightweight list of the user's saved in-progress fills (no bytes) so
+    // they can resume any of them. Full data is fetched on demand via loadFill().
+    supabase
+      .from("document_fills")
+      .select("doc_key, doc_name, tender_id, updated_at")
+      .eq("user_id", userId)
+      .order("updated_at", { ascending: false })
+      .returns<{ doc_key: string; doc_name: string; tender_id: string | null; updated_at: string }[]>(),
+    params.tender
+      ? supabase.from("tenders").select("id, title, document_urls").eq("id", params.tender).maybeSingle<TenderRow>()
+      : Promise.resolve({ data: null as TenderRow | null }),
+  ]);
 
   const savedFills = (savedRows ?? []).map((r) => ({
     docKey: r.doc_key,
@@ -83,36 +92,27 @@ export default async function FillPage({
   }
   chips.push({ label: "Today's date", value: formatDate(new Date().toISOString()) });
 
-  // Load the tender's PDF documents (via the same-origin proxy) when opened
-  // from a tender. All of them go into a picker; `?doc=` chooses which loads
-  // first, otherwise the first PDF does.
+  // Turn the tender's PDF documents (via the same-origin proxy) into a
+  // picker. `?doc=` chooses which loads first, otherwise the first PDF does.
   let tenderDocs: { name: string; url: string; key: string }[] = [];
   let initialKey: string | undefined;
   let tenderTitle: string | undefined;
 
-  if (params.tender) {
-    const { data: tender } = await supabase
-      .from("tenders")
-      .select("id, title, document_urls")
-      .eq("id", params.tender)
-      .maybeSingle<{ id: string; title: string; document_urls: string[] | null }>();
+  if (tender) {
+    tenderTitle = tender.title;
+    tenderDocs = describeDocuments(tender.document_urls)
+      .filter((d) => d.isPdf)
+      .map((d) => ({
+        name: d.name,
+        url: `/tenders/${tender.id}/document?i=${d.index}`,
+        key: `tender:${tender.id}:${d.index}`,
+      }));
 
-    if (tender) {
-      tenderTitle = tender.title;
-      tenderDocs = describeDocuments(tender.document_urls)
-        .filter((d) => d.isPdf)
-        .map((d) => ({
-          name: d.name,
-          url: `/tenders/${tender.id}/document?i=${d.index}`,
-          key: `tender:${tender.id}:${d.index}`,
-        }));
-
-      const docIndex = Number.parseInt(params.doc ?? "", 10);
-      const wanted = Number.isInteger(docIndex)
-        ? tenderDocs.find((d) => d.key === `tender:${tender.id}:${docIndex}`)
-        : undefined;
-      initialKey = wanted?.key ?? tenderDocs[0]?.key;
-    }
+    const docIndex = Number.parseInt(params.doc ?? "", 10);
+    const wanted = Number.isInteger(docIndex)
+      ? tenderDocs.find((d) => d.key === `tender:${tender.id}:${docIndex}`)
+      : undefined;
+    initialKey = wanted?.key ?? tenderDocs[0]?.key;
   }
 
   return (

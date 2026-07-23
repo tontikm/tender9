@@ -148,7 +148,7 @@ create table if not exists tender_matches (
   id uuid primary key default gen_random_uuid(),
   tender_id uuid references tenders(id) on delete cascade,
   profile_id uuid references matching_profiles(id) on delete cascade,
-  user_id uuid references auth.users(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
   match_score numeric,
   status text default 'new',          -- 'new' | 'saved' | 'dismissed' | 'applied'
   notified_at timestamptz,
@@ -166,6 +166,11 @@ update tender_matches tm
 set user_id = mp.user_id
 from matching_profiles mp
 where tm.profile_id = mp.id and tm.user_id is null;
+
+-- Every insert path (matchTenders, saveTenderFromBrowse) always sets
+-- user_id now, so require it going forward — a null user_id would
+-- otherwise fail closed under RLS and become a permanently invisible row.
+alter table tender_matches alter column user_id set not null;
 
 -- Drafted response narratives (Claude-generated cover letter / EOI text).
 -- One draft per tender — regenerating overwrites the previous draft.

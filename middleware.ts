@@ -6,8 +6,11 @@ import { NextResponse, type NextRequest } from "next/server";
 const AUTH_ONLY_PATHS = ["/login", "/signup"];
 
 // Always viewable regardless of auth state — signed-in users are NOT
-// redirected away from these (unlike AUTH_ONLY_PATHS and "/").
-const ALWAYS_PUBLIC_PATHS = ["/privacy"];
+// redirected away from these (unlike AUTH_ONLY_PATHS and "/"). The reset
+// flow needs this: clicking the emailed link establishes a real session via
+// /auth/reset, and the user must still land on /reset-password afterwards
+// rather than being bounced to /dashboard for "already being signed in".
+const ALWAYS_PUBLIC_PATHS = ["/privacy", "/forgot-password", "/reset-password", "/auth/reset"];
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });

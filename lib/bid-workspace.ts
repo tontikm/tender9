@@ -57,10 +57,6 @@ export interface WorkspaceChecklist {
   custom: CustomTask[];
 }
 
-export function emptyChecklist(): WorkspaceChecklist {
-  return { done: {}, custom: [] };
-}
-
 // Normalises whatever came back from jsonb into a well-formed checklist,
 // tolerating nulls/partial shapes from older rows.
 export function normaliseChecklist(raw: unknown): WorkspaceChecklist {
