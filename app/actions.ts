@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getSupabaseAuthClient, getCurrentUser } from "@/lib/supabase-auth";
-import { generateDraftForTender } from "@/lib/draft";
 
 const VALID_STATUSES = ["new", "saved", "dismissed", "applied"];
 
@@ -76,9 +75,4 @@ export async function saveTenderFromBrowse(tenderId: string) {
   revalidatePath("/browse");
   revalidatePath("/dashboard");
   revalidatePath("/workspace");
-}
-
-export async function generateDraft(tenderId: string) {
-  await generateDraftForTender(tenderId);
-  revalidatePath("/dashboard");
 }

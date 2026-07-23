@@ -1269,6 +1269,30 @@ button:hover,
   font-size: 14px;
 }
 
+.route-error {
+  max-width: 440px;
+  margin: 80px auto;
+  text-align: center;
+}
+
+.route-error h1 {
+  font-size: 20px;
+  margin: 0 0 10px;
+}
+
+.route-error p {
+  color: var(--color-text-muted);
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0 0 24px;
+}
+
+.route-error-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
 /* ---------- Profile cards / forms ---------- */
 
 .profile-card {

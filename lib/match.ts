@@ -94,13 +94,17 @@ export async function matchTenders(tenderIds: string[]): Promise<number> {
   if (profilesError) throw profilesError;
   if (!profiles || profiles.length === 0) return 0;
 
-  const tenderRows: TenderRow[] = [];
-  for (const idChunk of chunk(tenderIds, CHUNK_SIZE)) {
-    const { data, error } = await supabase
-      .from("tenders")
-      .select("id, title, description, category, province, value_estimate")
-      .in("id", idChunk);
+  // Each chunk is an independent lookup, so fetch/prune/upsert them all in
+  // parallel instead of one round-trip after another.
+  const tenderIdChunks = chunk(tenderIds, CHUNK_SIZE);
 
+  const tenderResults = await Promise.all(
+    tenderIdChunks.map((idChunk) =>
+      supabase.from("tenders").select("id, title, description, category, province, value_estimate").in("id", idChunk)
+    )
+  );
+  const tenderRows: TenderRow[] = [];
+  for (const { data, error } of tenderResults) {
     if (error) throw error;
     tenderRows.push(...(data ?? []));
   }
@@ -140,37 +144,38 @@ export async function matchTenders(tenderIds: string[]): Promise<number> {
   const activeProfileIds = new Set((profiles as MatchingProfile[]).map((p) => p.id));
   const shouldExist = new Set(matchesToInsert.map((m) => `${m.tender_id}:${m.profile_id}`));
 
-  for (const idChunk of chunk(tenderIds, CHUNK_SIZE)) {
-    const { data: existing, error: existingError } = await supabase
-      .from("tender_matches")
-      .select("id, tender_id, profile_id")
-      .in("tender_id", idChunk)
-      .eq("status", "new");
+  const existingResults = await Promise.all(
+    tenderIdChunks.map((idChunk) =>
+      supabase.from("tender_matches").select("id, tender_id, profile_id").in("tender_id", idChunk).eq("status", "new")
+    )
+  );
 
+  const staleIds: string[] = [];
+  for (const { data: existing, error: existingError } of existingResults) {
     if (existingError) throw existingError;
+    staleIds.push(
+      ...(existing ?? [])
+        .filter((m) => activeProfileIds.has(m.profile_id) && !shouldExist.has(`${m.tender_id}:${m.profile_id}`))
+        .map((m) => m.id)
+    );
+  }
 
-    const staleIds = (existing ?? [])
-      .filter(
-        (m) =>
-          activeProfileIds.has(m.profile_id) &&
-          !shouldExist.has(`${m.tender_id}:${m.profile_id}`)
-      )
-      .map((m) => m.id);
-
-    for (const delChunk of chunk(staleIds, CHUNK_SIZE)) {
-      const { error: delError } = await supabase.from("tender_matches").delete().in("id", delChunk);
-      if (delError) throw delError;
-    }
+  const deleteResults = await Promise.all(
+    chunk(staleIds, CHUNK_SIZE).map((delChunk) => supabase.from("tender_matches").delete().in("id", delChunk))
+  );
+  for (const { error } of deleteResults) {
+    if (error) throw error;
   }
 
   if (matchesToInsert.length === 0) return 0;
 
-  for (const matchChunk of chunk(matchesToInsert, CHUNK_SIZE)) {
-    const { error: upsertError } = await supabase
-      .from("tender_matches")
-      .upsert(matchChunk, { onConflict: "tender_id,profile_id" });
-
-    if (upsertError) throw upsertError;
+  const upsertResults = await Promise.all(
+    chunk(matchesToInsert, CHUNK_SIZE).map((matchChunk) =>
+      supabase.from("tender_matches").upsert(matchChunk, { onConflict: "tender_id,profile_id" })
+    )
+  );
+  for (const { error } of upsertResults) {
+    if (error) throw error;
   }
 
   return matchesToInsert.length;

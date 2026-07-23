@@ -1,8 +1,20 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { getSupabaseAuthClient, getCurrentUser } from "@/lib/supabase-auth";
 import { rematchAllTenders } from "@/lib/match";
+
+// Re-scoring every tender against every profile is the slow part of saving
+// or toggling a profile — run it after the response is sent instead of
+// making the user wait on a full-table rescan, then revalidate again once
+// it actually finishes so the dashboard reflects the fresh matches.
+function rematchInBackground() {
+  after(async () => {
+    await rematchAllTenders();
+    revalidatePath("/dashboard");
+  });
+}
 
 // Keywords are the user's own search terms, so accept whatever separator they
 // reach for — newlines AND commas (people naturally type "ict, computers,
@@ -66,10 +78,9 @@ export async function saveProfile(
 
   if (error) return { ok: false, error: error.message };
 
-  await rematchAllTenders();
-
   revalidatePath("/profiles");
   revalidatePath("/dashboard");
+  rematchInBackground();
   return { ok: true, error: null };
 }
 
@@ -89,10 +100,9 @@ export async function setProfileActive(id: string, active: boolean) {
 
   if (error) throw error;
 
-  await rematchAllTenders();
-
   revalidatePath("/profiles");
   revalidatePath("/dashboard");
+  rematchInBackground();
 }
 
 export async function deleteProfile(id: string) {

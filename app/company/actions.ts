@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getSupabaseAuthClient, getCurrentUser } from "@/lib/supabase-auth";
+import { checkBase64Size, MAX_LOGO_BYTES } from "@/lib/limits";
 
 // Shape returned to the client form (via useActionState) so the UI can show
 // a success or error message inline instead of throwing an error overlay.
@@ -53,6 +54,12 @@ export async function saveCompanyProfile(
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "Not signed in" };
 
+  const logo = logoOrNull(formData);
+  if (logo) {
+    const sizeError = checkBase64Size(logo, MAX_LOGO_BYTES, "Logo image");
+    if (sizeError) return { ok: false, error: sizeError };
+  }
+
   const record: Record<string, string | null> = { user_id: user.id };
   for (const field of TEXT_FIELDS) {
     record[field] = textOrNull(formData, field);
@@ -61,7 +68,7 @@ export async function saveCompanyProfile(
     // <input type=date> gives "" when empty and a valid "YYYY-MM-DD" otherwise.
     record[field] = textOrNull(formData, field);
   }
-  record.logo_data_url = logoOrNull(formData);
+  record.logo_data_url = logo;
   record.updated_at = new Date().toISOString();
 
   const supabase = await getSupabaseAuthClient();

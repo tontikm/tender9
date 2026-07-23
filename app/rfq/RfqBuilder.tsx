@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import type { PDFFont, PDFPage } from "pdf-lib";
+import type { PDFPage } from "pdf-lib";
 import type { CompanyProfile } from "../company/CompanyForm";
 import { emptyItem, normaliseItems, type RfqItem } from "./types";
 import { parseItemLines } from "./parse-items";
 import { saveRfq, deleteRfq } from "./actions";
+import { dataUrlToBytes, sanitizeForPdf, wrapText, drawRight, drawTracked } from "@/lib/pdf-helpers";
 
 const PAGE_W = 595.28;
 const PAGE_H = 841.89;
@@ -16,70 +17,10 @@ const QTY_COL_W = 70;
 const DESC_COL_W = CONTENT_W - QTY_COL_W - 14;
 const TABLE_HEADER_H = 22;
 
-function dataUrlToBytes(dataUrl: string): Uint8Array {
-  const bin = atob(dataUrl.split(",")[1] ?? "");
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
-}
-
 // Lets a company's address be typed without spaces after commas (common
 // when pasted from elsewhere) and still wrap cleanly in the PDF.
 function normaliseAddress(address: string): string {
   return address.replace(/,(?=\S)/g, ", ").replace(/\s+/g, " ").trim();
-}
-
-function wrapText(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
-  const words = text.split(/\s+/).filter(Boolean);
-  if (words.length === 0) return [""];
-  const lines: string[] = [];
-  let current = "";
-  for (const word of words) {
-    const test = current ? `${current} ${word}` : word;
-    if (current && font.widthOfTextAtSize(test, size) > maxWidth) {
-      lines.push(current);
-      current = word;
-    } else {
-      current = test;
-    }
-  }
-  if (current) lines.push(current);
-  return lines;
-}
-
-function drawRight(
-  page: PDFPage,
-  text: string,
-  rightX: number,
-  y: number,
-  font: PDFFont,
-  size: number,
-  color: ReturnType<typeof import("pdf-lib").rgb>
-) {
-  const w = font.widthOfTextAtSize(text, size);
-  page.drawText(text, { x: rightX - w, y, size, font, color });
-}
-
-// Manually letter-spaced, centered text — used once for the document title,
-// to read more like a formal letterhead masthead than plain app UI text.
-function drawTracked(
-  page: PDFPage,
-  text: string,
-  centerX: number,
-  y: number,
-  font: PDFFont,
-  size: number,
-  color: ReturnType<typeof import("pdf-lib").rgb>,
-  tracking: number
-) {
-  const chars = text.split("");
-  const totalWidth =
-    chars.reduce((w, c) => w + font.widthOfTextAtSize(c, size), 0) + tracking * Math.max(0, chars.length - 1);
-  let x = centerX - totalWidth / 2;
-  for (const c of chars) {
-    page.drawText(c, { x, y, size, font, color });
-    x += font.widthOfTextAtSize(c, size) + tracking;
-  }
 }
 
 function todayFormatted(): string {
@@ -158,7 +99,11 @@ export function RfqBuilder({
 
   const handleDelete = () => {
     startTransition(async () => {
-      await deleteRfq(rfqId);
+      const res = await deleteRfq(rfqId);
+      if (!res.ok) {
+        setError(`Could not delete: ${res.error}`);
+        return;
+      }
       window.location.href = tenderId ? `/tenders/${tenderId}/workspace` : "/rfq";
     });
   };
@@ -204,12 +149,14 @@ export function RfqBuilder({
         }
       }
 
-      const companyName = company?.trading_name || company?.legal_name || "";
-      const addressLine = company?.physical_address ? normaliseAddress(company.physical_address) : "";
+      const companyName = sanitizeForPdf(company?.trading_name || company?.legal_name || "");
+      const addressLine = company?.physical_address
+        ? sanitizeForPdf(normaliseAddress(company.physical_address))
+        : "";
       const companyDetailLines = [
         addressLine,
-        [company?.contact_email, company?.contact_phone].filter(Boolean).join("  ·  "),
-        company?.vat_number ? `VAT: ${company.vat_number}` : "",
+        sanitizeForPdf([company?.contact_email, company?.contact_phone].filter(Boolean).join("  ·  ")),
+        company?.vat_number ? sanitizeForPdf(`VAT: ${company.vat_number}`) : "",
       ].filter(Boolean);
 
       let page = doc.addPage([PAGE_W, PAGE_H]);
@@ -255,7 +202,7 @@ export function RfqBuilder({
 
       let leftY = y;
       const leftEntries: [string, string][] = [
-        ["Reference", title || "Request for Quotation"],
+        ["Reference", sanitizeForPdf(title || "Request for Quotation")],
         ["Date issued", todayFormatted()],
         ["Quotes needed by", dueDate ? dateFormatted(dueDate) : "—"],
       ];
@@ -269,10 +216,18 @@ export function RfqBuilder({
       let rightY = y;
       drawRight(page, "PREPARED FOR", PAGE_W - MARGIN, rightY, bold, labelSize, accent);
       rightY -= 12;
-      drawRight(page, recipientName || "(supplier name not set)", PAGE_W - MARGIN, rightY, font, valueSize, ink);
+      drawRight(
+        page,
+        sanitizeForPdf(recipientName) || "(supplier name not set)",
+        PAGE_W - MARGIN,
+        rightY,
+        font,
+        valueSize,
+        ink
+      );
       rightY -= 18;
       if (recipientEmail) {
-        drawRight(page, recipientEmail, PAGE_W - MARGIN, rightY, font, 9, muted);
+        drawRight(page, sanitizeForPdf(recipientEmail), PAGE_W - MARGIN, rightY, font, 9, muted);
         rightY -= 14;
       }
 
@@ -290,7 +245,7 @@ export function RfqBuilder({
       drawTableHeader();
 
       items.forEach((item, index) => {
-        const descLines = wrapText(item.description || "—", font, 9.5, DESC_COL_W);
+        const descLines = wrapText(sanitizeForPdf(item.description) || "—", font, 9.5, DESC_COL_W);
         const rowHeight = Math.max(1, descLines.length) * 13 + 8;
 
         if (y - rowHeight < MARGIN + 100) {
@@ -317,7 +272,7 @@ export function RfqBuilder({
           page.drawText(line, { x: MARGIN + 10, y: rowY, size: 9.5, font, color: ink });
           rowY -= 13;
         });
-        drawRight(page, item.quantity || "—", PAGE_W - MARGIN - 10, y - 11, font, 9.5, ink);
+        drawRight(page, sanitizeForPdf(item.quantity) || "—", PAGE_W - MARGIN - 10, y - 11, font, 9.5, ink);
 
         y -= rowHeight;
       });
@@ -328,7 +283,7 @@ export function RfqBuilder({
       if (notes.trim()) {
         page.drawText("NOTES", { x: MARGIN, y, size: labelSize, font: bold, color: accent });
         y -= 14;
-        wrapText(notes, font, 9.5, CONTENT_W).forEach((line) => {
+        wrapText(sanitizeForPdf(notes), font, 9.5, CONTENT_W).forEach((line) => {
           if (y < MARGIN + 70) {
             page = doc.addPage([PAGE_W, PAGE_H]);
             drawAccentBar(page);
@@ -347,7 +302,7 @@ export function RfqBuilder({
           ? `Please submit your quotation by ${dateFormatted(dueDate)}.`
           : "";
       if (closing) {
-        wrapText(closing, font, 9.5, CONTENT_W).forEach((line) => {
+        wrapText(sanitizeForPdf(closing), font, 9.5, CONTENT_W).forEach((line) => {
           page.drawText(line, { x: MARGIN, y, size: 9.5, font, color: ink });
           y -= 13;
         });
@@ -357,10 +312,16 @@ export function RfqBuilder({
       if (company?.signatory_name) {
         page.drawLine({ start: { x: MARGIN, y }, end: { x: MARGIN + 160, y }, thickness: 0.8, color: hairline });
         y -= 15;
-        page.drawText(company.signatory_name, { x: MARGIN, y, size: 10.5, font: serifItalic, color: ink });
+        page.drawText(sanitizeForPdf(company.signatory_name), {
+          x: MARGIN,
+          y,
+          size: 10.5,
+          font: serifItalic,
+          color: ink,
+        });
         if (company.signatory_capacity) {
           y -= 13;
-          page.drawText(company.signatory_capacity, { x: MARGIN, y, size: 8.5, font, color: muted });
+          page.drawText(sanitizeForPdf(company.signatory_capacity), { x: MARGIN, y, size: 8.5, font, color: muted });
         }
       }
 

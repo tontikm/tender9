@@ -29,6 +29,9 @@ export default async function LoginPage({
         </form>
 
         <p className="auth-switch">
+          <a href="/forgot-password">Forgot your password?</a>
+        </p>
+        <p className="auth-switch">
           Don&apos;t have an account? <a href="/signup">Sign up</a>
         </p>
       </div>

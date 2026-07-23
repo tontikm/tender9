@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getSupabaseAuthClient, getCurrentUser } from "@/lib/supabase-auth";
+import { MAX_RFQ_ITEMS_BYTES } from "@/lib/limits";
 import type { RfqItem } from "./types";
 
 export interface SaveRfqInput {
@@ -23,6 +24,11 @@ export interface SaveRfqResult {
 export async function saveRfq(input: SaveRfqInput): Promise<SaveRfqResult> {
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "Not signed in" };
+
+  const itemsJson = JSON.stringify(input.items);
+  if (itemsJson.length > MAX_RFQ_ITEMS_BYTES) {
+    return { ok: false, error: "That item list is too large — try splitting it into more than one request." };
+  }
 
   const supabase = await getSupabaseAuthClient();
   const { error } = await supabase.from("rfqs").upsert(
@@ -48,9 +54,11 @@ export async function saveRfq(input: SaveRfqInput): Promise<SaveRfqResult> {
   return { ok: true, error: null };
 }
 
-export async function deleteRfq(id: string): Promise<void> {
+export async function deleteRfq(id: string): Promise<SaveRfqResult> {
   const user = await getCurrentUser();
-  if (!user) return;
+  if (!user) return { ok: false, error: "Not signed in" };
   const supabase = await getSupabaseAuthClient();
-  await supabase.from("rfqs").delete().eq("id", id).eq("user_id", user.id);
+  const { error } = await supabase.from("rfqs").delete().eq("id", id).eq("user_id", user.id);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, error: null };
 }

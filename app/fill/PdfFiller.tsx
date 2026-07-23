@@ -10,6 +10,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { SignaturePad } from "./SignaturePad";
 import { saveFill, loadFill, deleteFill } from "./actions";
+import { dataUrlToBytes, hexToRgb01, sanitizeForPdf } from "@/lib/pdf-helpers";
 
 export interface SavedFill {
   docKey: string;
@@ -79,13 +80,6 @@ interface SavedSig {
   aspect: number;
 }
 
-function dataUrlToBytes(dataUrl: string): Uint8Array {
-  const bin = atob(dataUrl.split(",")[1] ?? "");
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
-}
-
 interface PageMeta {
   cssW: number;
   cssH: number;
@@ -105,26 +99,6 @@ const DEFAULT_INK = 1.8; // pt stroke
 const MIN_INK = 0.8;
 const MAX_INK = 6;
 const PEN_COLORS = ["#1a1a1a", "#c81e1e", "#1d4ed8"]; // black, red, blue
-
-function hexToRgb01(hex: string): [number, number, number] {
-  const n = hex.replace("#", "");
-  return [
-    parseInt(n.slice(0, 2), 16) / 255,
-    parseInt(n.slice(2, 4), 16) / 255,
-    parseInt(n.slice(4, 6), 16) / 255,
-  ];
-}
-
-// pdf-lib's standard Helvetica uses WinAnsi encoding — map smart punctuation
-// to safe equivalents and replace anything else it can't encode.
-function sanitizeForPdf(text: string): string {
-  return text
-    .replace(/[‘’]/g, "'")
-    .replace(/[“”]/g, '"')
-    .replace(/…/g, "...")
-    .replace(/[–—]/g, "-")
-    .replace(/[^\x20-\x7E\xA0-\xFF\n]/g, "?");
-}
 
 function truncate(text: string, max = 40): string {
   const oneLine = text.replace(/\n/g, " ");
@@ -408,11 +382,14 @@ export function PdfFiller({
   };
 
   const removeSaved = async (key: string) => {
+    const removed = fills.find((f) => f.docKey === key);
     setFills((prev) => prev.filter((f) => f.docKey !== key));
-    try {
-      await deleteFill(key);
-    } catch {
-      // ignore — the row is gone from the list either way; a refresh reconciles
+    const res = await deleteFill(key);
+    if (!res.ok) {
+      // Put it back — the delete didn't actually happen, so the list
+      // shouldn't pretend it did.
+      if (removed) setFills((prev) => [removed, ...prev]);
+      setError(`Could not delete: ${res.error}`);
     }
   };
 

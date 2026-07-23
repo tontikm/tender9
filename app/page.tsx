@@ -25,8 +25,8 @@ const FEATURES = [
   },
   {
     Icon: IconDocument,
-    title: "SBD forms auto-filled",
-    body: "Store your company details once and generate pre-filled SBD 1, 4, 6.1, 8 and 9 for any tender, ready to download as a PDF in a click.",
+    title: "Fill official forms in minutes",
+    body: "Store your company details once, then click to place them directly onto any tender's actual PDF forms, signature included, ready to download.",
   },
   {
     Icon: IconClipboard,
@@ -54,7 +54,7 @@ const STEPS = [
   {
     n: "3",
     title: "Prepare and submit",
-    body: "Work through the requirements checklist, generate your pre-filled SBD forms, and submit with confidence.",
+    body: "Work through the requirements checklist, fill in the official forms with your saved details, and submit with confidence.",
   },
 ];
 
@@ -67,7 +67,7 @@ export default function MarketingHomePage() {
         <p className="hero-subtitle">
           Tender9 watches the National Treasury eTenders feed around the clock, scores every new
           tender against your business profile, and helps you prepare a compliant bid, from the
-          requirements checklist to pre-filled SBD forms.
+          requirements checklist to filling in the official forms.
         </p>
         <div className="hero-actions">
           <a href="/signup" className="btn-primary">

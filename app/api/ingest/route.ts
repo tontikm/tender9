@@ -1,3 +1,4 @@
+import { timingSafeEqual, createHash } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase";
 import {
@@ -7,6 +8,23 @@ import {
   type NormalizedTender,
 } from "@/lib/ocds";
 import { matchTenders } from "@/lib/match";
+
+// A run stuck in "running" past this long almost certainly crashed rather
+// than finished — mark it failed so the dashboard banner doesn't say
+// "still running" forever.
+const STALE_RUN_MINUTES = 10;
+
+// Hashing both sides to a fixed length before comparing avoids leaking the
+// secret's length via timingSafeEqual's own length check.
+function safeCompare(a: string, b: string): boolean {
+  const ah = createHash("sha256").update(a).digest();
+  const bh = createHash("sha256").update(b).digest();
+  return timingSafeEqual(ah, bh);
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
 
 export const dynamic = "force-dynamic"; // never cache — this must run fresh every time
 export const maxDuration = 60; // seconds; adjust in vercel.json / plan limits if needed
@@ -37,14 +55,28 @@ function isoDay(date: Date): string {
  *   curl https://your-app.vercel.app/api/ingest -H "Authorization: Bearer YOUR_CRON_SECRET"
  */
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  const expected = `Bearer ${process.env.CRON_SECRET}`;
+  const authHeader = request.headers.get("authorization") ?? "";
+  const secret = process.env.CRON_SECRET;
 
-  if (!process.env.CRON_SECRET || authHeader !== expected) {
+  if (!secret || !safeCompare(authHeader, `Bearer ${secret}`)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const supabase = getSupabaseServerClient();
+
+  // Close out any run left stuck in "running" from a crashed previous
+  // invocation, before starting this one.
+  const staleThreshold = new Date(Date.now() - STALE_RUN_MINUTES * 60_000).toISOString();
+  await supabase
+    .from("ingestion_runs")
+    .update({
+      status: "failed",
+      error_message: "Timed out — marked stale by a later run",
+      finished_at: new Date().toISOString(),
+    })
+    .eq("source", "etenders_ocds")
+    .eq("status", "running")
+    .lt("started_at", staleThreshold);
 
   const { data: runRow, error: runInsertError } = await supabase
     .from("ingestion_runs")
@@ -107,13 +139,15 @@ export async function GET(request: NextRequest) {
     const records = [...normalizedById.values()];
 
     // Which of these already exist? (for the new-vs-updated stat only)
+    // Chunks are independent lookups, so fetch them all in parallel.
     const existingExternalIds = new Set<string>();
-    for (const idChunk of chunk(records.map((r) => r.external_id), 200)) {
-      const { data } = await supabase
-        .from("tenders")
-        .select("external_id")
-        .eq("source", "etenders_ocds")
-        .in("external_id", idChunk);
+    const idChunks = chunk(records.map((r) => r.external_id), 200);
+    const existingResults = await Promise.all(
+      idChunks.map((idChunk) =>
+        supabase.from("tenders").select("external_id").eq("source", "etenders_ocds").in("external_id", idChunk)
+      )
+    );
+    for (const { data } of existingResults) {
       for (const row of data ?? []) existingExternalIds.add(row.external_id);
     }
 
@@ -155,19 +189,16 @@ export async function GET(request: NextRequest) {
       updated: updatedCount,
       matches: matchCount,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     await supabase
       .from("ingestion_runs")
       .update({
         finished_at: new Date().toISOString(),
         status: "failed",
-        error_message: String(err?.message ?? err),
+        error_message: errorMessage(err),
       })
       .eq("id", runRow.id);
 
-    return NextResponse.json(
-      { status: "failed", error: String(err?.message ?? err) },
-      { status: 500 }
-    );
+    return NextResponse.json({ status: "failed", error: errorMessage(err) }, { status: 500 });
   }
 }
