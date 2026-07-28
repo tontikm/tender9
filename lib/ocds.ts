@@ -40,6 +40,15 @@ function addDays(day: string, n: number): string {
   return isoDay(d);
 }
 
+// The OCDS API is known to be flaky (see the pagination-slowdown notes
+// above) and has occasionally hung indefinitely rather than erroring —
+// which, with no timeout on the fetch itself, silently ran out the clock on
+// Vercel's hard function timeout instead of failing cleanly, leaving the
+// ingestion_runs row stuck "running" until a later run's stale-check closed
+// it. Aborting well before that budget turns a silent multi-day hang into
+// an immediate, loggable failure.
+const FETCH_TIMEOUT_MS = 25_000;
+
 async function fetchWindow(dateFrom: string, dateTo: string): Promise<unknown[]> {
   const releases: unknown[] = [];
   let url = `${OCDS_BASE_URL}${OCDS_RELEASES_PATH}?${new URLSearchParams({
@@ -50,7 +59,10 @@ async function fetchWindow(dateFrom: string, dateTo: string): Promise<unknown[]>
   })}`;
 
   for (let page = 0; page < MAX_PAGES_PER_WINDOW && url; page++) {
-    const res = await fetch(url, { headers: { Accept: "application/json" } });
+    const res = await fetch(url, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
 
     if (!res.ok) {
       throw new Error(`OCDS API request failed: ${res.status} ${res.statusText}`);
