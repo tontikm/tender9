@@ -22,8 +22,16 @@ function safeCompare(a: string, b: string): boolean {
   return timingSafeEqual(ah, bh);
 }
 
+// fetch() failures (DNS, connection refused, TLS, timeout) reject with a
+// generic "fetch failed" TypeError whose real cause lives one level down in
+// `.cause` — surfacing it is the difference between an error_message that's
+// actually debuggable and one that just says "fetch failed" every time.
 function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
+  if (!(err instanceof Error)) return String(err);
+  const cause = (err as Error & { cause?: unknown }).cause;
+  if (!cause) return err.message;
+  const causeMsg = cause instanceof Error ? `${cause.name}: ${cause.message}` : String(cause);
+  return `${err.message} (${causeMsg})`;
 }
 
 export const dynamic = "force-dynamic"; // never cache — this must run fresh every time
