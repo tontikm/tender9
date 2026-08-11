@@ -1,4 +1,4 @@
-# Tender9 — Phase 1
+# Tender9 
 
 Ingestion pipeline: pulls tenders from the National Treasury eTenders OCDS API,
 stores them in Supabase, and matches them against your business profile(s).
