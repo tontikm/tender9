@@ -1,85 +1,66 @@
-# Tender9 
+# Tender9
 
-Ingestion pipeline: pulls tenders from the National Treasury eTenders OCDS API,
-stores them in Supabase, and matches them against your business profile(s).
+Tender9 helps South African companies find government tenders they qualify for and prepare the paperwork to bid.
 
-## What's included in this phase
+It pulls tender data from the National Treasury eTenders OCDS API, stores it in Supabase, matches each tender against a company profile, and auto fills the standard SBD bid forms from stored company details.
 
-- Supabase schema (`supabase/schema.sql`)
-- OCDS API fetch + normalize logic (`lib/ocds.ts`)
-- Matching logic (`lib/match.ts`)
-- Ingestion API route (`app/api/ingest/route.ts`), meant to be called hourly by Vercel Cron
-- Minimal placeholder homepage (dashboard comes in Phase 2)
+Live: https://tender9.vercel.app
 
-## Setup
+![Tender9 dashboard](docs/screenshot.png)
 
-### 1. Install dependencies
+## Why
+
+Government tenders in South Africa are published across scattered portals with inconsistent formats, and every bid needs the same set of SBD forms filled in by hand. Small suppliers either miss tenders they qualify for or spend hours on paperwork per bid. Tender9 automates both parts.
+
+## Stack
+
+Next.js 15 (App Router), TypeScript, Supabase, PostgreSQL, Vercel
+
+## How it works
+
+1. A scheduled Vercel Cron job hits the ingestion route
+2. The route fetches from the eTenders OCDS API and normalises the response
+3. Tenders are stored in Supabase
+4. Matching logic scores each tender against the saved company profile
+5. Matched tenders are surfaced in the dashboard and sent by email
+6. SBD forms are generated from the stored company profile
+
+## Structure
+
+| Path | What it does |
+|---|---|
+| `lib/ocds.ts` | eTenders OCDS API fetch and normalisation |
+| `lib/match.ts` | Tender to company profile matching logic |
+| `app/api/ingest/route.ts` | Ingestion endpoint, called by Vercel Cron |
+| `supabase/schema.sql` | Database schema and row level security policies |
+| `middleware.ts` | Auth and route protection |
+
+## Database
+
+Five tables: `tenders`, `matching_profiles`, `tender_matches`, `tender_drafts`, `ingestion_runs`.
+
+Row level security is enabled on all tables. The service role key is used server side only.
+
+## Running locally
 
 ```bash
 npm install
 ```
 
-### 2. Set up Supabase
+Set up the database. In your Supabase project, open SQL Editor, then New query, then paste and run the contents of `supabase/schema.sql`.
 
-1. In your Supabase project dashboard, go to **SQL Editor → New query**.
-2. Paste the entire contents of `supabase/schema.sql` and run it.
-3. Confirm five tables now exist: `tenders`, `matching_profiles`, `tender_matches`, `tender_drafts`, `ingestion_runs` — and that a starter row exists in `matching_profiles`.
-
-### 3. Environment variables
+Set environment variables.
 
 ```bash
 cp .env.local.example .env.local
 ```
 
-Fill in:
-- `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` — from Supabase Project Settings → API
-- `SUPABASE_SERVICE_ROLE_KEY` — same page, the service_role secret. **Never commit this.**
-- `CRON_SECRET` — any random string (`openssl rand -hex 16`), protects the ingest endpoint from public access
-- `ANTHROPIC_API_KEY` — from https://console.anthropic.com/settings/keys, powers the "Draft response"
-  button on saved tenders. Optional: without it, drafting saves a visible error instead of crashing.
-
-### 4. IMPORTANT — verify the OCDS API details before running
-
-`lib/ocds.ts` has placeholder values for the exact endpoint path and query
-parameter names, marked with `TODO` comments. Before running ingestion:
-
-1. Open https://ocds-api.etenders.gov.za/swagger/index.html
-2. Find the endpoint that returns releases/tenders
-3. Update `OCDS_RELEASES_PATH` and the query param names in `fetchOcdsReleases()`
-   in `lib/ocds.ts` to match exactly what the Swagger UI shows
-4. Check one real response to confirm the field paths in `normalizeRelease()`
-   (e.g. `tender.title`, `tender.value.amount`) match what the API actually returns —
-   these follow standard OCDS conventions but the SA implementation may have quirks
-
-### 5. Run locally
+Fill in your Supabase URL, anon key, service role key, and Resend API key.
 
 ```bash
 npm run dev
 ```
 
-Test ingestion manually (don't wait for the cron):
+## Status
 
-```bash
-curl http://localhost:3000/api/ingest -H "Authorization: Bearer YOUR_CRON_SECRET"
-```
-
-Check the `ingestion_runs` table in Supabase to confirm it logged a run, and
-check `tenders` / `tender_matches` for results.
-
-### 6. Deploy to Vercel
-
-1. Push this repo to GitHub (already done).
-2. Import the repo in Vercel.
-3. Add the same environment variables from `.env.local` in Vercel's project settings (Environment Variables).
-4. Deploy. The `vercel.json` cron config will automatically run `/api/ingest` hourly once deployed — Vercel Cron only runs on deployed projects, not locally.
-
-## Response drafting
-
-On any tender you've marked **Saved**, a "Draft response" button generates a
-cover-letter/EOI narrative via the Claude API (`lib/draft.ts`), stored in
-`tender_drafts` (one draft per tender — regenerating overwrites it).
-
-## Next steps
-
-Fixed-form filling (auto-populating standard SBD forms) is the remaining
-item from the original roadmap.
+In active development. Ingestion, matching, notifications and SBD form generation are working. Currently covers eTenders only.
