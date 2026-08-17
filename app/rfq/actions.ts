@@ -27,7 +27,7 @@ export async function saveRfq(input: SaveRfqInput): Promise<SaveRfqResult> {
 
   const itemsJson = JSON.stringify(input.items);
   if (itemsJson.length > MAX_RFQ_ITEMS_BYTES) {
-    return { ok: false, error: "That item list is too large — try splitting it into more than one request." };
+    return { ok: false, error: "That item list is too large. Try splitting it into more than one request." };
   }
 
   const supabase = await getSupabaseAuthClient();

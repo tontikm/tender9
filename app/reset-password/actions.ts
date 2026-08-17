@@ -21,5 +21,5 @@ export async function updatePassword(formData: FormData) {
     redirect(`/reset-password?error=${encodeURIComponent(error.message)}`);
   }
 
-  redirect(`/login?message=${encodeURIComponent("Password updated — sign in with your new password.")}`);
+  redirect(`/login?message=${encodeURIComponent("Password updated. Sign in with your new password.")}`);
 }

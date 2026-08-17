@@ -15,7 +15,7 @@ export function RouteError({ error, reset }: { error: Error & { digest?: string 
     <main className="route-error">
       <h1>Something went wrong</h1>
       <p>
-        That didn&apos;t go through — nothing you had should be lost. Try again, or head back and
+        That didn&apos;t go through, but nothing you had should be lost. Try again, or head back and
         pick up where you left off.
       </p>
       <div className="route-error-actions">
