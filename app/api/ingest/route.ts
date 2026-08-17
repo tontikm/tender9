@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
     .from("ingestion_runs")
     .update({
       status: "failed",
-      error_message: "Timed out — marked stale by a later run",
+      error_message: "Timed out, marked stale by a later run",
       finished_at: new Date().toISOString(),
     })
     .eq("source", "etenders_ocds")

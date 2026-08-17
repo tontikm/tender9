@@ -208,7 +208,7 @@ function ExistingProfileRow({
           <span className="profile-summary-actions">
             <label
               className="profile-toggle"
-              title={active ? "On — contributing matches" : "Off — not matched against tenders"}
+              title={active ? "On: contributing matches" : "Off: not matched against tenders"}
               onClick={(e) => e.stopPropagation()}
             >
               <input type="checkbox" checked={active} disabled={pending} onChange={toggleActive} />

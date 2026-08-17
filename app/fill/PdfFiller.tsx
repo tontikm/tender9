@@ -371,7 +371,7 @@ export function PdfFiller({
         if (!res.ok) throw new Error(`the server returned ${res.status}`);
         await openBytes(new Uint8Array(await res.arrayBuffer()), saved.docName, key);
       } else {
-        throw new Error("the original file is not available — re-open it to continue");
+        throw new Error("the original file is not available, please re-open it to continue");
       }
       // openBytes set docKey -> the restore effect applies the saved placements.
       setCurrentKey(key);
