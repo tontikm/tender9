@@ -10,7 +10,7 @@ const AUTH_ONLY_PATHS = ["/login", "/signup"];
 // flow needs this: clicking the emailed link establishes a real session via
 // /auth/reset, and the user must still land on /reset-password afterwards
 // rather than being bounced to /dashboard for "already being signed in".
-const ALWAYS_PUBLIC_PATHS = ["/privacy", "/forgot-password", "/reset-password", "/auth/reset"];
+const ALWAYS_PUBLIC_PATHS = ["/privacy", "/forgot-password", "/reset-password", "/auth/reset", "/home"];
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
