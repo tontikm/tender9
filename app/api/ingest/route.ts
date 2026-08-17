@@ -38,11 +38,15 @@ export const dynamic = "force-dynamic"; // never cache — this must run fresh e
 export const maxDuration = 60; // seconds; adjust in vercel.json / plan limits if needed
 
 // Never try to catch up more than this in one run — bounds the work so a run
-// can't blow the 60s timeout after a gap. With a daily cron the real window
-// is ~1 day (~13s); a ~10-day catch-up already approaches the limit, so cap
-// well under that. If the cron is down longer than this, the oldest tail is
-// skipped rather than risk a run that times out and never marks success.
-const MAX_CATCHUP_DAYS = 7;
+// can't blow the 60s timeout after a gap. With WINDOW_DAYS=1 (lib/ocds.ts)
+// each day's window is ~9s worst case in isolation, but a live 4-day catch-up
+// run measured at 56s total once DB upsert/match work is included — too
+// close to the 60s ceiling for comfort. 3 days leaves real margin. If the
+// cron is down longer than this, the oldest tail is skipped rather than risk
+// a run that times out and never marks success — once any run succeeds, the
+// next one resumes from "since last success" and closes the rest of the gap
+// a few days at a time rather than reopening it.
+const MAX_CATCHUP_DAYS = 3;
 
 const UPSERT_CHUNK = 500;
 
