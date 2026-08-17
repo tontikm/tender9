@@ -1,13 +1,24 @@
 import type { MetadataRoute } from "next";
 
-// Only the public marketing pages are worth indexing — everything else
-// requires sign-in and would just be a login redirect to a crawler anyway.
+// /browse and every /tenders/<id> page are public tender data (see
+// middleware.ts) and are the actual SEO payoff, so they're crawlable.
+// Everything that requires sign-in stays disallowed — a crawler would just
+// hit a login redirect there anyway.
 export default function robots(): MetadataRoute.Robots {
   return {
     rules: {
       userAgent: "*",
-      allow: ["/", "/privacy"],
-      disallow: ["/dashboard", "/browse", "/workspace", "/tenders", "/fill", "/rfq", "/profiles", "/company", "/api"],
+      allow: ["/", "/privacy", "/browse", "/tenders"],
+      disallow: [
+        "/dashboard",
+        "/tenders/*/workspace",
+        "/workspace",
+        "/fill",
+        "/rfq",
+        "/profiles",
+        "/company",
+        "/api",
+      ],
     },
   };
 }

@@ -6,6 +6,36 @@ import {
   IconClipboard,
   IconBell,
 } from "./components/icons";
+import { getSupabaseAuthClient } from "@/lib/supabase-auth";
+
+export const dynamic = "force-dynamic";
+
+async function getHomeStats() {
+  const supabase = await getSupabaseAuthClient();
+  const now = new Date();
+  const nowIso = now.toISOString();
+  // Trailing 24h rather than "since midnight" — ingestion runs continuously,
+  // so a calendar-day window would show 0 for hours after midnight and
+  // undercut the "round-the-clock" pitch right on the hero.
+  const last24hIso = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+  const weekEndIso = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  const [openRes, addedTodayRes, closingSoonRes] = await Promise.all([
+    supabase.from("tenders").select("id", { count: "planned", head: true }).gte("closing_date", nowIso),
+    supabase.from("tenders").select("id", { count: "exact", head: true }).gte("created_at", last24hIso),
+    supabase
+      .from("tenders")
+      .select("id", { count: "planned", head: true })
+      .gte("closing_date", nowIso)
+      .lte("closing_date", weekEndIso),
+  ]);
+
+  return {
+    open: openRes.count ?? 0,
+    addedToday: addedTodayRes.count ?? 0,
+    closingSoon: closingSoonRes.count ?? 0,
+  };
+}
 
 const FEATURES = [
   {
@@ -58,7 +88,9 @@ const STEPS = [
   },
 ];
 
-export default function MarketingHomePage() {
+export default async function MarketingHomePage() {
+  const stats = await getHomeStats();
+
   return (
     <main className="marketing-main">
       <section className="hero">
@@ -78,6 +110,21 @@ export default function MarketingHomePage() {
           </a>
         </div>
         <p className="hero-note">No credit card required · Covers all SA government tenders</p>
+
+        <div className="hero-stats">
+          <div className="hero-stat">
+            <span className="hero-stat-number">{stats.open.toLocaleString("en-ZA")}</span>
+            <span className="hero-stat-label">open tenders right now</span>
+          </div>
+          <div className="hero-stat">
+            <span className="hero-stat-number">{stats.addedToday.toLocaleString("en-ZA")}</span>
+            <span className="hero-stat-label">added in the last 24 hours</span>
+          </div>
+          <div className="hero-stat">
+            <span className="hero-stat-number">{stats.closingSoon.toLocaleString("en-ZA")}</span>
+            <span className="hero-stat-label">closing this week</span>
+          </div>
+        </div>
       </section>
 
       <section className="how-it-works">

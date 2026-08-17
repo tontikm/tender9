@@ -7,10 +7,12 @@ export function TenderDocuments({
   tenderId,
   documents,
   savedDocIndexes = [],
+  signedIn = true,
 }: {
   tenderId: string;
   documents: TenderDocument[];
   savedDocIndexes?: number[];
+  signedIn?: boolean;
 }) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const saved = new Set(savedDocIndexes);
@@ -24,12 +26,17 @@ export function TenderDocuments({
             <div className="document-row">
               <span className="document-name">{doc.name}</span>
               <span className="document-actions">
-                {doc.isPdf && (
+                {doc.isPdf && signedIn && (
                   <a
                     href={`/fill?tender=${tenderId}&doc=${doc.index}`}
                     className={`document-preview-btn ${saved.has(doc.index) ? "resume" : ""}`}
                   >
                     {saved.has(doc.index) ? "Resume fill" : "Fill"}
+                  </a>
+                )}
+                {doc.isPdf && !signedIn && (
+                  <a href="/signup" className="document-preview-btn">
+                    Sign up to fill
                   </a>
                 )}
                 {doc.isPdf && (
