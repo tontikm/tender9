@@ -18,15 +18,21 @@ const OCDS_RELEASES_PATH = "/api/OCDSReleases";
 // few hundred make the API take 40s+ per page — stick to its own default.
 //
 // The API also has a server-side pagination bug: within a single query, each
-// subsequent page gets linearly slower (page 1 ~3s, page 18 ~32s) and
-// `links.next` keeps appearing well past where the release count should be
-// exhausted. To stay reliable we fetch the requested range in small date
-// WINDOWS, each paginated from page 1 — so no single sequence ever gets deep
-// enough to slow to a crawl, and no window holds enough releases to hit the
-// per-window page cap and silently truncate. This is what keeps ingestion
-// from dropping tenders on wider catch-up runs.
+// subsequent page gets linearly slower (page 1 ~2-3s, page 5 ~11s — measured
+// directly against the live API). To stay reliable we fetch the requested
+// range in small date WINDOWS, each paginated from page 1 — so no single
+// sequence ever gets deep enough to slow to a crawl, and no window holds
+// enough releases to hit the per-window page cap and silently truncate.
+//
+// WINDOW_DAYS was originally 3, but real tender volume now means a 3-day
+// window needs enough pages to blow past FETCH_TIMEOUT_MS before finishing —
+// this is what silently broke the daily cron for 19 straight days (every run
+// from 2026-07-29 to 2026-08-17 failed with an abort timeout). A measured
+// 1-day window stays at 1-2 pages / under ~9s worst case, comfortably inside
+// budget. See app/api/ingest/route.ts's MAX_CATCHUP_DAYS for the related fix
+// to how big a gap a single run will try to close.
 export const DEFAULT_LOOKBACK_DAYS = 3;
-const WINDOW_DAYS = 3;
+const WINDOW_DAYS = 1;
 const PAGE_SIZE = 100;
 const MAX_PAGES_PER_WINDOW = 15;
 
