@@ -6,7 +6,7 @@ export default function PrivacyPolicyPage() {
   return (
     <main className="legal-main">
       <h1>Privacy Policy</h1>
-      <p className="subtitle">Last updated: 8 July 2026</p>
+      <p className="subtitle">Last updated: 17 August 2026</p>
 
       <p>
         Tender9 (&quot;Tender9&quot;, &quot;we&quot;, &quot;us&quot;) provides a South African
@@ -31,15 +31,22 @@ export default function PrivacyPolicyPage() {
           categories, provinces, and value ranges used to match you against government tenders.
         </li>
         <li>
+          If you use the company profile and document-filling tools, the company details you
+          enter there: registered name, CIPC registration number, VAT number, CSD number, SARS
+          tax compliance PIN, B-BBEE level and certificate expiry, CIDB grade, physical address,
+          contact details, banking details, and the name and capacity of your authorised
+          signatory.
+        </li>
+        <li>
           Your usage of the service (which tenders you save, dismiss, or mark as applied), so we
           can show you your own pipeline.
         </li>
       </ul>
       <p>
-        We do not currently collect sensitive information such as banking details, tax or ID
-        numbers. If future features require this (for example, auto-filling tender application
-        forms), this policy will be updated before that data is collected, and separate consent
-        will be requested.
+        The company and banking details above are used only to pre-fill your own copy of
+        official tender documents (SBD forms, RFQs) — Tender9 does not process payments or move
+        money on your behalf, and this data is never shared with third parties beyond the
+        infrastructure providers listed below.
       </p>
 
       <h2>3. Why we process it</h2>

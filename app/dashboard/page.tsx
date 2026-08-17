@@ -52,6 +52,32 @@ interface IngestionRun {
   error_message: string | null;
 }
 
+interface ProfileCriteria {
+  keywords: string[] | null;
+  categories: string[] | null;
+  provinces: string[] | null;
+}
+
+// Mirrors lib/match.ts's scoring: with no keywords, categories, or
+// provinces set, every tender scores 0 and can never clear the minimum —
+// an "active" profile like this silently matches nothing, forever.
+function hasCriteria(profile: ProfileCriteria): boolean {
+  return (
+    (profile.keywords?.length ?? 0) > 0 ||
+    (profile.categories?.length ?? 0) > 0 ||
+    (profile.provinces?.length ?? 0) > 0
+  );
+}
+
+function OnboardingNudge() {
+  return (
+    <div className="run-banner nudge">
+      Your matching profile has no keywords, categories, or provinces set yet, so it can&apos;t
+      match any tenders. <a href="/profiles">Set it up</a> to start seeing matches.
+    </div>
+  );
+}
+
 function StatsBar({ counts }: { counts: Record<string, number> }) {
   const stats = [
     { label: "New", value: counts.new ?? 0 },
@@ -210,7 +236,7 @@ export default async function DashboardPage({
   // Matches select only the columns the dashboard renders — NOT tenders(*),
   // which would drag in the large raw_payload JSON per row. All
   // filtering/sorting/paging/counting is then done in app code.
-  const [{ data: lastRun }, { data: allMatches, error }] = await Promise.all([
+  const [{ data: lastRun }, { data: allMatches, error }, { data: activeProfiles }] = await Promise.all([
     supabase
       .from("ingestion_runs")
       .select("status, started_at, finished_at, records_fetched, records_new, records_updated, error_message")
@@ -225,9 +251,16 @@ export default async function DashboardPage({
       .eq("user_id", userId)
       .order("match_score", { ascending: false })
       .returns<MatchRow[]>(),
+    supabase
+      .from("matching_profiles")
+      .select("keywords, categories, provinces")
+      .eq("user_id", userId)
+      .eq("active", true)
+      .returns<ProfileCriteria[]>(),
   ]);
 
   const all = allMatches ?? [];
+  const needsOnboarding = !(activeProfiles ?? []).some(hasCriteria);
 
   // Stats-bar counts: every non-expired match grouped by status.
   const statusCounts = all
@@ -265,6 +298,8 @@ export default async function DashboardPage({
       <p className="subtitle">Tenders from the eTenders OCDS feed, scored against your matching profiles.</p>
 
       <StatsBar counts={statusCounts} />
+
+      {needsOnboarding && <OnboardingNudge />}
 
       <RunBanner run={lastRun as IngestionRun | null} />
 

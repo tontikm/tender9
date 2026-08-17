@@ -5,6 +5,8 @@ import {
   IconDocument,
   IconClipboard,
   IconBell,
+  IconShield,
+  IconMail,
 } from "./components/icons";
 import { getSupabaseAuthClient } from "@/lib/supabase-auth";
 
@@ -46,7 +48,7 @@ const FEATURES = [
   {
     Icon: IconTag,
     title: "Smart matching",
-    body: "Set your keywords, categories, provinces and value range once. Every new tender is scored against your criteria, so you only see what fits.",
+    body: "Tell us what kind of work you do — keywords, categories, provinces, value range. We check every new tender against that automatically, so your dashboard only ever shows tenders worth your time.",
   },
   {
     Icon: IconCheck,
@@ -70,6 +72,25 @@ const FEATURES = [
   },
 ];
 
+const FAQS = [
+  {
+    q: "Where does the tender data come from?",
+    a: "Every tender comes straight from National Treasury's official eTenders OCDS feed — the same public data South African government departments publish themselves. We don't create, edit, or curate tenders; we monitor them, match them to your business, and help you prepare a bid.",
+  },
+  {
+    q: "How often does it update?",
+    a: "Automatically, once a day. New and updated tenders are pulled in, matched against your profile, and waiting in your dashboard the next time you check.",
+  },
+  {
+    q: "Is Tender9 an official government service?",
+    a: "No. Tender9 is an independent tool, not affiliated with National Treasury or any government department — we simply make their public tender data easier to monitor and act on. Always confirm final requirements against the official tender documents before submitting a bid.",
+  },
+  {
+    q: "What happens to the details I add?",
+    a: "Your company details — registration, tax, B-BBEE, banking, and so on — are stored securely and used only to pre-fill your own copy of official tender forms. They're never shared with third parties beyond the infrastructure providers that host Tender9. Full details in our privacy policy.",
+  },
+];
+
 const STEPS = [
   {
     n: "1",
@@ -79,7 +100,7 @@ const STEPS = [
   {
     n: "2",
     title: "Get matched tenders",
-    body: "We score every new tender against your profile daily and surface the relevant ones, sorted by closing date.",
+    body: "Every day we check new tenders against what you told us and show you the ones that match, with the soonest closing dates first.",
   },
   {
     n: "3",
@@ -149,6 +170,49 @@ export default async function MarketingHomePage() {
               <h3>{title}</h3>
               <p>{body}</p>
             </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="trust">
+        <div className="trust-grid">
+          <div className="trust-card">
+            <IconShield className="trust-icon" />
+            <h3>POPIA compliant</h3>
+            <p>
+              Your information is protected under South Africa&apos;s Protection of Personal
+              Information Act — encrypted in transit, access-controlled per account, never sold.{" "}
+              <a href="/privacy">Read our privacy policy →</a>
+            </p>
+          </div>
+          <div className="trust-card">
+            <IconBuilding className="trust-icon" />
+            <h3>Straight from National Treasury</h3>
+            <p>
+              Every tender comes directly from government&apos;s own eTenders OCDS feed. Tender9
+              is an independent tool, not a government service.
+            </p>
+          </div>
+          <div className="trust-card">
+            <IconMail className="trust-icon" />
+            <h3>Tender9 (Pty) Ltd</h3>
+            <p>
+              Company registration in progress. Questions or concerns? Email us at{" "}
+              <a href="mailto:privacy@tender9.co.za">privacy@tender9.co.za</a> — we read every
+              message.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="faq">
+        <h2 className="section-title">Frequently asked questions</h2>
+        <div className="faq-list">
+          {FAQS.map(({ q, a }) => (
+            <details className="faq-item" key={q}>
+              <summary className="faq-question">{q}</summary>
+              <p className="faq-answer">{a}</p>
+            </details>
           ))}
         </div>
       </section>

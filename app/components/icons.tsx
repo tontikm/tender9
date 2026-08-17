@@ -92,3 +92,21 @@ export function IconBell({ className }: IconProps) {
     </svg>
   );
 }
+
+export function IconShield({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
+      <path d="m9 12 2 2 4-4" />
+    </svg>
+  );
+}
+
+export function IconMail({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <rect x="2" y="4" width="20" height="16" rx="2" />
+      <path d="m2 7 10 6 10-6" />
+    </svg>
+  );
+}

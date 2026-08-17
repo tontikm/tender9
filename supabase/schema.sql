@@ -211,13 +211,17 @@ alter table tender_matches enable row level security;
 alter table tender_drafts enable row level security;
 alter table ingestion_runs enable row level security;
 
--- Tenders and ingestion run status are shared, non-sensitive system data —
--- any signed-in user can read them, but only server-side code (service
--- role) writes them.
+-- Tenders are public government data, shown on signed-out pages (/browse,
+-- /tenders/<id>, the sitemap, homepage stats) for SEO — so this policy must
+-- cover the anon role, not just authenticated, or every one of those pages
+-- silently returns zero rows to a real signed-out visitor (including
+-- crawlers, which defeats the entire point of making them public). Only
+-- server-side code (service role) writes to this table.
 drop policy if exists "Authenticated users can read tenders" on tenders;
-create policy "Authenticated users can read tenders"
+drop policy if exists "Anyone can read tenders" on tenders;
+create policy "Anyone can read tenders"
   on tenders for select
-  to authenticated
+  to public
   using (true);
 
 drop policy if exists "Authenticated users can read ingestion runs" on ingestion_runs;
