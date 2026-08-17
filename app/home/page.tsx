@@ -6,5 +6,5 @@
 export { default } from "../page";
 
 export const metadata = {
-  title: "Tender9 — Home",
+  title: "Home",
 };

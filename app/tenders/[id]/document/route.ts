@@ -1,5 +1,5 @@
 import { type NextRequest } from "next/server";
-import { getSupabaseAuthClient, getCurrentUser } from "@/lib/supabase-auth";
+import { getSupabaseAuthClient } from "@/lib/supabase-auth";
 
 export const dynamic = "force-dynamic";
 // The gov document server can be slow — give the fetch room, same as ingest.
@@ -10,14 +10,14 @@ export const maxDuration = 60;
 // open relay / SSRF vector.
 const ALLOWED_HOST = "www.etenders.gov.za";
 
+// No sign-in check here on purpose: this proxies the same government file
+// the (also-public) Download link already points straight at — it's public
+// data either way, this just renders it inline for the tender preview.
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-
-  const user = await getCurrentUser();
-  if (!user) return new Response("Unauthorized", { status: 401 });
 
   const index = Number.parseInt(request.nextUrl.searchParams.get("i") ?? "", 10);
   if (!Number.isInteger(index) || index < 0) {

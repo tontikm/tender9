@@ -10,7 +10,17 @@ const AUTH_ONLY_PATHS = ["/login", "/signup"];
 // flow needs this: clicking the emailed link establishes a real session via
 // /auth/reset, and the user must still land on /reset-password afterwards
 // rather than being bounced to /dashboard for "already being signed in".
-const ALWAYS_PUBLIC_PATHS = ["/privacy", "/forgot-password", "/reset-password", "/auth/reset", "/home"];
+// /browse is here too — raw tender listings are public data, free SEO/
+// credibility, and the tools (matching, workspace, fill, RFQ) stay gated.
+const ALWAYS_PUBLIC_PATHS = ["/privacy", "/forgot-password", "/reset-password", "/auth/reset", "/home", "/browse"];
+
+// A single tender's own page, its document preview, and its calendar file
+// are public for the same reason as /browse — but NOT /tenders/<id>/workspace,
+// which shows the signed-in user's own bid-prep notes and must stay gated
+// even though it's nested under the now-public /tenders/<id>.
+function isPublicTenderPath(pathname: string): boolean {
+  return /^\/tenders\/[^/]+(\/(document|calendar))?$/.test(pathname);
+}
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -39,7 +49,8 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isAuthOnlyPath = AUTH_ONLY_PATHS.some((p) => pathname.startsWith(p));
   const isHomepage = pathname === "/";
-  const isAlwaysPublicPath = ALWAYS_PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+  const isAlwaysPublicPath =
+    ALWAYS_PUBLIC_PATHS.some((p) => pathname.startsWith(p)) || isPublicTenderPath(pathname);
 
   if (isAlwaysPublicPath) {
     return response;
@@ -61,5 +72,7 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.svg|robots.txt|api/ingest).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|icon.svg|robots.txt|opengraph-image|twitter-image|sitemap.xml|api/ingest).*)",
+  ],
 };

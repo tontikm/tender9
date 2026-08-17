@@ -5,7 +5,39 @@ import {
   IconDocument,
   IconClipboard,
   IconBell,
+  IconShield,
+  IconMail,
 } from "./components/icons";
+import { getSupabaseAuthClient } from "@/lib/supabase-auth";
+
+export const dynamic = "force-dynamic";
+
+async function getHomeStats() {
+  const supabase = await getSupabaseAuthClient();
+  const now = new Date();
+  const nowIso = now.toISOString();
+  // Trailing 24h rather than "since midnight" — ingestion runs continuously,
+  // so a calendar-day window would show 0 for hours after midnight and
+  // undercut the "round-the-clock" pitch right on the hero.
+  const last24hIso = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+  const weekEndIso = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  const [openRes, addedTodayRes, closingSoonRes] = await Promise.all([
+    supabase.from("tenders").select("id", { count: "planned", head: true }).gte("closing_date", nowIso),
+    supabase.from("tenders").select("id", { count: "exact", head: true }).gte("created_at", last24hIso),
+    supabase
+      .from("tenders")
+      .select("id", { count: "planned", head: true })
+      .gte("closing_date", nowIso)
+      .lte("closing_date", weekEndIso),
+  ]);
+
+  return {
+    open: openRes.count ?? 0,
+    addedToday: addedTodayRes.count ?? 0,
+    closingSoon: closingSoonRes.count ?? 0,
+  };
+}
 
 const FEATURES = [
   {
@@ -16,7 +48,7 @@ const FEATURES = [
   {
     Icon: IconTag,
     title: "Smart matching",
-    body: "Set your keywords, categories, provinces and value range once. Every new tender is scored against your criteria, so you only see what fits.",
+    body: "Tell us what kind of work you do: keywords, categories, provinces, value range. We check every new tender against that automatically, so your dashboard only ever shows tenders worth your time.",
   },
   {
     Icon: IconCheck,
@@ -40,6 +72,25 @@ const FEATURES = [
   },
 ];
 
+const FAQS = [
+  {
+    q: "Where does the tender data come from?",
+    a: "Every tender comes straight from National Treasury's official eTenders OCDS feed. It's the same public data South African government departments publish themselves. We don't create, edit, or curate tenders; we monitor them, match them to your business, and help you prepare a bid.",
+  },
+  {
+    q: "How often does it update?",
+    a: "Automatically, once a day. New and updated tenders are pulled in, matched against your profile, and waiting in your dashboard the next time you check.",
+  },
+  {
+    q: "Is Tender9 an official government service?",
+    a: "No. Tender9 is an independent tool, not affiliated with National Treasury or any government department. We simply make their public tender data easier to monitor and act on. Always confirm final requirements against the official tender documents before submitting a bid.",
+  },
+  {
+    q: "What happens to the details I add?",
+    a: "Your company details (registration, tax, B-BBEE, banking, and so on) are stored securely and used only to pre-fill your own copy of official tender forms. They're never shared with third parties beyond the infrastructure providers that host Tender9. Full details in our privacy policy.",
+  },
+];
+
 const STEPS = [
   {
     n: "1",
@@ -49,7 +100,7 @@ const STEPS = [
   {
     n: "2",
     title: "Get matched tenders",
-    body: "We score every new tender against your profile daily and surface the relevant ones, sorted by closing date.",
+    body: "Every day we check new tenders against what you told us and show you the ones that match, with the soonest closing dates first.",
   },
   {
     n: "3",
@@ -58,7 +109,9 @@ const STEPS = [
   },
 ];
 
-export default function MarketingHomePage() {
+export default async function MarketingHomePage() {
+  const stats = await getHomeStats();
+
   return (
     <main className="marketing-main">
       <section className="hero">
@@ -78,6 +131,21 @@ export default function MarketingHomePage() {
           </a>
         </div>
         <p className="hero-note">No credit card required · Covers all SA government tenders</p>
+
+        <div className="hero-stats">
+          <div className="hero-stat">
+            <span className="hero-stat-number">{stats.open.toLocaleString("en-ZA")}</span>
+            <span className="hero-stat-label">open tenders right now</span>
+          </div>
+          <div className="hero-stat">
+            <span className="hero-stat-number">{stats.addedToday.toLocaleString("en-ZA")}</span>
+            <span className="hero-stat-label">added in the last 24 hours</span>
+          </div>
+          <div className="hero-stat">
+            <span className="hero-stat-number">{stats.closingSoon.toLocaleString("en-ZA")}</span>
+            <span className="hero-stat-label">closing this week</span>
+          </div>
+        </div>
       </section>
 
       <section className="how-it-works">
@@ -102,6 +170,49 @@ export default function MarketingHomePage() {
               <h3>{title}</h3>
               <p>{body}</p>
             </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="trust">
+        <div className="trust-grid">
+          <div className="trust-card">
+            <IconShield className="trust-icon" />
+            <h3>POPIA compliant</h3>
+            <p>
+              Your information is protected under South Africa&apos;s Protection of Personal
+              Information Act: encrypted in transit, access-controlled per account, never sold.{" "}
+              <a href="/privacy">Read our privacy policy →</a>
+            </p>
+          </div>
+          <div className="trust-card">
+            <IconBuilding className="trust-icon" />
+            <h3>Straight from National Treasury</h3>
+            <p>
+              Every tender comes directly from government&apos;s own eTenders OCDS feed. Tender9
+              is an independent tool, not a government service.
+            </p>
+          </div>
+          <div className="trust-card">
+            <IconMail className="trust-icon" />
+            <h3>Tender9 (Pty) Ltd</h3>
+            <p>
+              Company registration in progress. Questions or concerns? Email us at{" "}
+              <a href="mailto:privacy@tender9.co.za">privacy@tender9.co.za</a>. We read every
+              message.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="faq">
+        <h2 className="section-title">Frequently asked questions</h2>
+        <div className="faq-list">
+          {FAQS.map(({ q, a }) => (
+            <details className="faq-item" key={q}>
+              <summary className="faq-question">{q}</summary>
+              <p className="faq-answer">{a}</p>
+            </details>
           ))}
         </div>
       </section>

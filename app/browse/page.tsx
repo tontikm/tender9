@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { getSupabaseAuthClient, getCurrentUser } from "@/lib/supabase-auth";
 import { IconBuilding, IconTag, IconMapPin, IconCalendar } from "../components/icons";
 import { formatDate, formatValue } from "@/lib/format";
@@ -5,6 +6,12 @@ import { SA_PROVINCES } from "@/lib/provinces";
 import { saveTenderFromBrowse } from "../actions";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Browse SA government tenders",
+  description:
+    "Search every open South African government tender from the National Treasury eTenders feed, by keyword, category, or province.",
+};
 
 const PAGE_SIZE = 20;
 
@@ -130,7 +137,9 @@ export default async function BrowsePage({
     <main>
       <h1>Browse tenders</h1>
       <p className="subtitle">
-        Search every open tender in the eTenders feed, not only the ones matched to your profiles.
+        {user
+          ? "Search every open tender in the eTenders feed, not only the ones matched to your profiles."
+          : "Every open South African government tender, straight from the National Treasury eTenders feed."}
       </p>
 
       <form className="browse-search" method="get" action="/browse">
@@ -208,9 +217,15 @@ export default async function BrowsePage({
 
             {status !== "saved" && status !== "applied" && (
               <div className="match-actions">
-                <form action={saveTenderFromBrowse.bind(null, tender.id)}>
-                  <button type="submit">Save</button>
-                </form>
+                {user ? (
+                  <form action={saveTenderFromBrowse.bind(null, tender.id)}>
+                    <button type="submit">Save</button>
+                  </form>
+                ) : (
+                  <a href="/signup" className="hub-view-link">
+                    Sign up to save this &rarr;
+                  </a>
+                )}
               </div>
             )}
           </article>

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getSupabaseAuthClient, getCurrentUser } from "@/lib/supabase-auth";
 import { updateMatchStatus, dismissMatchAndReturn } from "../../actions";
@@ -8,6 +9,34 @@ import { describeDocuments } from "@/lib/tender-docs";
 import { TenderDocuments } from "./TenderDocuments";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const supabase = await getSupabaseAuthClient();
+  const { data: tender } = await supabase
+    .from("tenders")
+    .select("title, buyer_name, category, province, closing_date")
+    .eq("id", id)
+    .maybeSingle<{
+      title: string;
+      buyer_name: string | null;
+      category: string | null;
+      province: string | null;
+      closing_date: string | null;
+    }>();
+
+  if (!tender) return { title: "Tender not found" };
+
+  const bits = [tender.buyer_name, tender.category, tender.province].filter(Boolean);
+  return {
+    title: tender.title,
+    description: `${tender.title}${bits.length ? ` (${bits.join(", ")})` : ""}. Full requirements, documents, and closing date on Tender9.`,
+  };
+}
 
 const CATEGORY_LABELS: Record<string, string> = {
   goods: "goods",
@@ -53,13 +82,17 @@ export default async function TenderDetailPage({
 
   // Wherever the user actually came from (dashboard, browse, or my
   // workspace), so "back"/"dismiss" return them there instead of always
-  // landing on the dashboard.
-  const backHref = from && from.startsWith("/") && !from.startsWith("//") ? from : "/dashboard";
+  // landing on the dashboard. Signed-out visitors (e.g. from a Google
+  // search) have no dashboard to go back to, so default them to Browse.
+  const backHref =
+    from && from.startsWith("/") && !from.startsWith("//") ? from : user ? "/dashboard" : "/browse";
   const backLabel = from?.startsWith("/browse")
     ? "Back to browse"
     : from?.startsWith("/workspace")
       ? "Back to my workspace"
-      : "Back to matched tenders";
+      : user
+        ? "Back to matched tenders"
+        : "Back to browse";
 
   // Fire all of this tender's reads (plus the fire-and-forget viewed_at
   // stamp) in parallel instead of one sequential round-trip after another —
@@ -111,12 +144,20 @@ export default async function TenderDetailPage({
       <nav className="page-nav">
         <a href={backHref}>&larr; {backLabel}</a>
         <span className="page-nav-actions">
-          <a href={`/tenders/${tender.id}/workspace`} className="page-nav-cta secondary">
-            Bid workspace
-          </a>
-          <a href={`/fill?tender=${tender.id}`} className="page-nav-cta">
-            Fill documents
-          </a>
+          {user ? (
+            <>
+              <a href={`/tenders/${tender.id}/workspace`} className="page-nav-cta secondary">
+                Bid workspace
+              </a>
+              <a href={`/fill?tender=${tender.id}`} className="page-nav-cta">
+                Fill documents
+              </a>
+            </>
+          ) : (
+            <a href="/signup" className="page-nav-cta">
+              Sign up to prepare this bid
+            </a>
+          )}
         </span>
       </nav>
 
@@ -186,6 +227,7 @@ export default async function TenderDetailPage({
             tenderId={tender.id}
             documents={describeDocuments(tender.document_urls)}
             savedDocIndexes={savedDocIndexes}
+            signedIn={!!user}
           />
         </>
       )}
