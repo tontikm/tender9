@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Browse SA government tenders",
   description:
-    "Search every open South African government tender from the National Treasury eTenders feed — by keyword, category, or province.",
+    "Search every open South African government tender from the National Treasury eTenders feed, by keyword, category, or province.",
 };
 
 const PAGE_SIZE = 20;

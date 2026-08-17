@@ -1,5 +1,5 @@
 export const metadata = {
-  title: "Privacy Policy — Tender9",
+  title: "Privacy Policy",
 };
 
 export default function PrivacyPolicyPage() {
@@ -44,7 +44,7 @@ export default function PrivacyPolicyPage() {
       </ul>
       <p>
         The company and banking details above are used only to pre-fill your own copy of
-        official tender documents (SBD forms, RFQs) — Tender9 does not process payments or move
+        official tender documents (SBD forms, RFQs). Tender9 does not process payments or move
         money on your behalf, and this data is never shared with third parties beyond the
         infrastructure providers listed below.
       </p>

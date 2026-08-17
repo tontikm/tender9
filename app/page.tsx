@@ -48,7 +48,7 @@ const FEATURES = [
   {
     Icon: IconTag,
     title: "Smart matching",
-    body: "Tell us what kind of work you do — keywords, categories, provinces, value range. We check every new tender against that automatically, so your dashboard only ever shows tenders worth your time.",
+    body: "Tell us what kind of work you do: keywords, categories, provinces, value range. We check every new tender against that automatically, so your dashboard only ever shows tenders worth your time.",
   },
   {
     Icon: IconCheck,
@@ -75,7 +75,7 @@ const FEATURES = [
 const FAQS = [
   {
     q: "Where does the tender data come from?",
-    a: "Every tender comes straight from National Treasury's official eTenders OCDS feed — the same public data South African government departments publish themselves. We don't create, edit, or curate tenders; we monitor them, match them to your business, and help you prepare a bid.",
+    a: "Every tender comes straight from National Treasury's official eTenders OCDS feed. It's the same public data South African government departments publish themselves. We don't create, edit, or curate tenders; we monitor them, match them to your business, and help you prepare a bid.",
   },
   {
     q: "How often does it update?",
@@ -83,11 +83,11 @@ const FAQS = [
   },
   {
     q: "Is Tender9 an official government service?",
-    a: "No. Tender9 is an independent tool, not affiliated with National Treasury or any government department — we simply make their public tender data easier to monitor and act on. Always confirm final requirements against the official tender documents before submitting a bid.",
+    a: "No. Tender9 is an independent tool, not affiliated with National Treasury or any government department. We simply make their public tender data easier to monitor and act on. Always confirm final requirements against the official tender documents before submitting a bid.",
   },
   {
     q: "What happens to the details I add?",
-    a: "Your company details — registration, tax, B-BBEE, banking, and so on — are stored securely and used only to pre-fill your own copy of official tender forms. They're never shared with third parties beyond the infrastructure providers that host Tender9. Full details in our privacy policy.",
+    a: "Your company details (registration, tax, B-BBEE, banking, and so on) are stored securely and used only to pre-fill your own copy of official tender forms. They're never shared with third parties beyond the infrastructure providers that host Tender9. Full details in our privacy policy.",
   },
 ];
 
@@ -181,7 +181,7 @@ export default async function MarketingHomePage() {
             <h3>POPIA compliant</h3>
             <p>
               Your information is protected under South Africa&apos;s Protection of Personal
-              Information Act — encrypted in transit, access-controlled per account, never sold.{" "}
+              Information Act: encrypted in transit, access-controlled per account, never sold.{" "}
               <a href="/privacy">Read our privacy policy →</a>
             </p>
           </div>
@@ -198,7 +198,7 @@ export default async function MarketingHomePage() {
             <h3>Tender9 (Pty) Ltd</h3>
             <p>
               Company registration in progress. Questions or concerns? Email us at{" "}
-              <a href="mailto:privacy@tender9.co.za">privacy@tender9.co.za</a> — we read every
+              <a href="mailto:privacy@tender9.co.za">privacy@tender9.co.za</a>. We read every
               message.
             </p>
           </div>
