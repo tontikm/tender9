@@ -7,7 +7,7 @@ export async function Header() {
   return (
     <header className="site-header">
       <div className="site-header-inner">
-        <a href={user ? "/dashboard" : "/"} className="brand">
+        <a href={user ? "/home" : "/"} className="brand">
           <span className="brand-mark">T9</span>
           <span className="brand-name">Tender9</span>
         </a>
