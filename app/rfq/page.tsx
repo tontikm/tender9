@@ -2,12 +2,14 @@ import { getSupabaseAuthClient, getCurrentUser } from "@/lib/supabase-auth";
 import { formatDate } from "@/lib/format";
 import type { CompanyProfile } from "../company/CompanyForm";
 import { RfqBuilder, type ExistingRfq } from "./RfqBuilder";
+import { displayTitle } from "@/lib/tender-text";
 
 export const dynamic = "force-dynamic";
 
 interface TenderInfo {
   id: string;
   title: string;
+  description: string | null;
   buyer_name: string | null;
 }
 
@@ -31,7 +33,11 @@ export default async function RfqPage({
   const [{ data: profile }, tenderResult, rfqResult] = await Promise.all([
     supabase.from("company_profiles").select("*").eq("user_id", userId).maybeSingle<CompanyProfile>(),
     params.tender
-      ? supabase.from("tenders").select("id, title, buyer_name").eq("id", params.tender).maybeSingle<TenderInfo>()
+      ? supabase
+          .from("tenders")
+          .select("id, title, description, buyer_name")
+          .eq("id", params.tender)
+          .maybeSingle<TenderInfo>()
       : Promise.resolve({ data: null as TenderInfo | null }),
     params.id
       ? supabase
@@ -66,7 +72,10 @@ export default async function RfqPage({
 
       {tender && !existing && (
         <p className="rfq-context">
-          For <strong>{tender.title}</strong>
+          {/* displayTitle often ends in a period already (unlike a bare
+              reference-code title) — strip it so it doesn't collide with
+              the punctuation this sentence adds. */}
+          For <strong>{displayTitle(tender, 100).replace(/\.+$/, "")}</strong>
           {tender.buyer_name ? ` · ${tender.buyer_name}` : ""}.{" "}
           <a href={`/tenders/${tender.id}/workspace`}>Back to bid workspace</a>
         </p>

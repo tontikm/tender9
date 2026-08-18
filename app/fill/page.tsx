@@ -2,6 +2,7 @@ import { getSupabaseAuthClient, getCurrentUser } from "@/lib/supabase-auth";
 import { describeDocuments } from "@/lib/tender-docs";
 import { formatDate } from "@/lib/format";
 import { PdfFiller, type FillChip } from "./PdfFiller";
+import { displayTitle } from "@/lib/tender-text";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +58,7 @@ export default async function FillPage({
   interface TenderRow {
     id: string;
     title: string;
+    description: string | null;
     document_urls: string[] | null;
   }
 
@@ -73,7 +75,11 @@ export default async function FillPage({
       .order("updated_at", { ascending: false })
       .returns<{ doc_key: string; doc_name: string; tender_id: string | null; updated_at: string }[]>(),
     params.tender
-      ? supabase.from("tenders").select("id, title, document_urls").eq("id", params.tender).maybeSingle<TenderRow>()
+      ? supabase
+          .from("tenders")
+          .select("id, title, description, document_urls")
+          .eq("id", params.tender)
+          .maybeSingle<TenderRow>()
       : Promise.resolve({ data: null as TenderRow | null }),
   ]);
 
@@ -99,7 +105,7 @@ export default async function FillPage({
   let tenderTitle: string | undefined;
 
   if (tender) {
-    tenderTitle = tender.title;
+    tenderTitle = displayTitle(tender, 100);
     tenderDocs = describeDocuments(tender.document_urls)
       .filter((d) => d.isPdf)
       .map((d) => ({
@@ -120,7 +126,9 @@ export default async function FillPage({
       <h1>Fill a document</h1>
       <p className="subtitle">
         {tenderTitle
-          ? `Filling documents from ${tenderTitle}. `
+          ? // Descriptions (unlike reference-code titles) often already end
+            // in a period — avoid stacking a second one.
+            `Filling documents from ${tenderTitle.replace(/\.+$/, "")}. `
           : "Open any PDF, a tender's official forms or your own, and place your saved details exactly where they belong. "}
         Click a detail, then click the spot on the document. Works on scanned documents too.
       </p>

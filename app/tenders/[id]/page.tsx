@@ -7,6 +7,7 @@ import { formatDate, formatDateTime, formatValue } from "@/lib/format";
 import { extractRequirements } from "@/lib/requirements";
 import { describeDocuments } from "@/lib/tender-docs";
 import { TenderDocuments } from "./TenderDocuments";
+import { displayTitle, looksLikeReferenceCode } from "@/lib/tender-text";
 
 export const dynamic = "force-dynamic";
 
@@ -19,10 +20,11 @@ export async function generateMetadata({
   const supabase = await getSupabaseAuthClient();
   const { data: tender } = await supabase
     .from("tenders")
-    .select("title, buyer_name, category, province, closing_date")
+    .select("title, description, buyer_name, category, province, closing_date")
     .eq("id", id)
     .maybeSingle<{
       title: string;
+      description: string | null;
       buyer_name: string | null;
       category: string | null;
       province: string | null;
@@ -31,10 +33,11 @@ export async function generateMetadata({
 
   if (!tender) return { title: "Tender not found" };
 
+  const heading = displayTitle(tender, 70);
   const bits = [tender.buyer_name, tender.category, tender.province].filter(Boolean);
   return {
-    title: tender.title,
-    description: `${tender.title}${bits.length ? ` (${bits.join(", ")})` : ""}. Full requirements, documents, and closing date on Tender9.`,
+    title: heading,
+    description: `${heading}${bits.length ? ` (${bits.join(", ")})` : ""}. Full requirements, documents, and closing date on Tender9.`,
   };
 }
 
@@ -134,6 +137,7 @@ export default async function TenderDetailPage({
 
   if (!tender) notFound();
 
+  const headline = displayTitle(tender, 240);
   const requirements = extractRequirements(tender.raw_payload);
   const savedDocIndexes = (savedFillRows ?? [])
     .map((r) => Number.parseInt(r.doc_key.split(":")[2] ?? "", 10))
@@ -161,7 +165,18 @@ export default async function TenderDetailPage({
         </span>
       </nav>
 
-      <h1>{tender.title}</h1>
+      <h1>{headline}</h1>
+      {/* The reference code is real, load-bearing information (bidders quote
+          it in their submission) — when the headline above is the humanized
+          description instead, keep the raw code visible rather than
+          discarding it. Gated on looksLikeReferenceCode() too: the feed
+          isn't consistent about what lands in `title`, and some records
+          have ordinary (sometimes truncated) prose there instead of an
+          actual code — showing that back labelled "Ref:" would mislead
+          rather than help. */}
+      {headline !== tender.title && looksLikeReferenceCode(tender.title) && (
+        <p className="detail-ref">Ref: {tender.title}</p>
+      )}
 
       <div className="match-meta detail-meta">
         <span className="meta-item">

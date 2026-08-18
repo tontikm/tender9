@@ -1,6 +1,7 @@
 import { getSupabaseAuthClient } from "@/lib/supabase-auth";
 import { Reveal } from "./components/Reveal";
 import { Countdown } from "./components/Countdown";
+import { humanize, clip } from "@/lib/tender-text";
 
 export const dynamic = "force-dynamic";
 
@@ -13,49 +14,6 @@ interface ShowcaseTender {
   province: string | null;
   closing_date: string | null;
   briefing_date: string | null;
-}
-
-// Acronyms worth keeping capitalised when we un-shout an all-caps description.
-// Deliberately excludes ambiguous two-letter words like "it" and "hr", which
-// are far more often ordinary words than initialisms.
-const ACRONYMS =
-  /\b(rfq|rfp|rfi|eoi|sbd|tor|ict|sa|sars|cidb|hiv|ppe|gps|cctv|hvac|sla|kzn)\b/gi;
-
-// Kept lowercase mid-sentence so title casing doesn't read like a headline.
-const MINOR_WORDS = new Set([
-  "a", "an", "the", "and", "or", "but", "of", "at", "by", "for",
-  "in", "on", "to", "with", "from", "as", "per", "via", "vs",
-]);
-
-/**
- * Tender descriptions arrive from the feed in wildly inconsistent casing —
- * roughly half are shouted in full caps. Left as-is they look broken at
- * display sizes.
- *
- * Title case (rather than sentence case) is the right target here: these
- * strings are dense with proper nouns — department names, airports, town
- * names — that sentence casing would flatten into "airports company south
- * africa king phalo".
- */
-function humanize(raw: string): string {
-  const clean = raw.replace(/\s+/g, " ").trim();
-  const letters = clean.replace(/[^A-Za-z]/g, "");
-  const uppers = clean.replace(/[^A-Z]/g, "");
-  if (!letters.length || uppers.length / letters.length < 0.7) return clean;
-
-  return clean
-    .toLowerCase()
-    .split(" ")
-    .map((word, i) => {
-      if (i > 0 && MINOR_WORDS.has(word.replace(/[^a-z]/g, ""))) return word;
-      return word.charAt(0).toUpperCase() + word.slice(1);
-    })
-    .join(" ")
-    .replace(ACRONYMS, (m) => m.toUpperCase());
-}
-
-function clip(text: string, max: number): string {
-  return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
 }
 
 function shortDate(iso: string | null): string {
@@ -165,7 +123,7 @@ function TenderRow({ tender }: { tender: ShowcaseTender }) {
   return (
     <a className="m-row" href={`/tenders/${tender.id}`}>
       <span className="m-row-body">
-        <span className="m-row-title">{clip(humanize(tender.description ?? tender.title), 92)}</span>
+        <span className="m-row-title">{humanize(clip(tender.description ?? tender.title, 92))}</span>
         <span className="m-row-meta">
           {tender.buyer_name}
           {tender.province ? <span className="m-dot-sep">{tender.province}</span> : null}
@@ -277,7 +235,7 @@ export default async function MarketingHomePage() {
                 </span>
               </div>
               <p className="m-match-title">
-                {clip(humanize(showcase[0].description ?? showcase[0].title), 130)}
+                {humanize(clip(showcase[0].description ?? showcase[0].title, 130))}
               </p>
               <div className="m-chips">
                 {showcase[0].category && <span className="m-chip">{showcase[0].category}</span>}
@@ -347,7 +305,7 @@ export default async function MarketingHomePage() {
           <Reveal delay={120}>
             <div className="m-deadline">
               <p className="m-deadline-title">
-                {clip(humanize(soonest.description ?? soonest.title), 96)}
+                {humanize(clip(soonest.description ?? soonest.title, 96))}
               </p>
               <p className="m-deadline-buyer">{soonest.buyer_name}</p>
               <Countdown

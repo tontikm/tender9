@@ -4,6 +4,7 @@ import { IconBuilding, IconTag, IconMapPin, IconCalendar } from "../components/i
 import { formatDate, formatValue } from "@/lib/format";
 import { SA_PROVINCES } from "@/lib/provinces";
 import { ProvinceSelect } from "./ProvinceSelect";
+import { displayTitle } from "@/lib/tender-text";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,7 @@ const PAGE_SIZE = 20;
 interface TenderRow {
   id: string;
   title: string;
+  description: string | null;
   buyer_name: string | null;
   category: string | null;
   province: string | null;
@@ -246,7 +248,7 @@ export default async function DashboardPage({
     supabase
       .from("tender_matches")
       .select(
-        "id, match_score, status, viewed_at, tenders!inner(id, title, buyer_name, category, province, value_estimate, currency, closing_date), matching_profiles(name)"
+        "id, match_score, status, viewed_at, tenders!inner(id, title, description, buyer_name, category, province, value_estimate, currency, closing_date), matching_profiles(name)"
       )
       .eq("user_id", userId)
       .order("match_score", { ascending: false })
@@ -354,7 +356,7 @@ export default async function DashboardPage({
               <div>
                 <h3 className="match-title">
                   <a href={`/tenders/${tender.id}?from=${encodeURIComponent(currentDashboardUrl)}`}>
-                    {tender.title}
+                    {displayTitle(tender)}
                   </a>
                 </h3>
                 <div className="match-meta">
