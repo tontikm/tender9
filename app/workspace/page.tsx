@@ -68,6 +68,19 @@ export default async function MyWorkspacePage({
         to hunt for it on the tender list.
       </p>
 
+      {/* General entry points into the two tools — not tied to any one
+          tender. Previously top-level header links; moved here since
+          day to day they're something you reach for, not a place you
+          land, and the header had gotten loud with 7 items. */}
+      <div className="page-nav-actions">
+        <a href="/fill" className="page-nav-cta secondary">
+          Fill a document
+        </a>
+        <a href="/rfq" className="page-nav-cta secondary">
+          Request a quote
+        </a>
+      </div>
+
       {entries.length === 0 ? (
         <div className="hub-empty">
           <IconClipboard className="hub-empty-icon" />

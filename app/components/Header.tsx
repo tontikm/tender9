@@ -19,8 +19,9 @@ export async function Header() {
             </a>
             <a href="/dashboard">Tenders</a>
             <a href="/browse">Browse</a>
-            <a href="/fill">Fill PDF</a>
-            <a href="/rfq">Request quotes</a>
+            {/* Fill PDF and Request quotes moved into the Workspace hub —
+                7 top-level links plus sign-out was too loud for what are,
+                day to day, secondary tools rather than places you land. */}
             <a href="/profiles">Profiles</a>
             <a href="/company">Company</a>
             <form action={signOut}>

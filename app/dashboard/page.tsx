@@ -1,10 +1,10 @@
 import { getSupabaseAuthClient, getCurrentUser } from "@/lib/supabase-auth";
-import { updateMatchStatus } from "../actions";
 import { IconBuilding, IconTag, IconMapPin, IconCalendar } from "../components/icons";
 import { formatDate, formatValue } from "@/lib/format";
 import { SA_PROVINCES } from "@/lib/provinces";
 import { ProvinceSelect } from "./ProvinceSelect";
 import { displayTitle } from "@/lib/tender-text";
+import { MatchCard } from "./MatchCard";
 
 export const dynamic = "force-dynamic";
 
@@ -346,12 +346,19 @@ export default async function DashboardPage({
         <p className="empty-state">No matches in this view yet.</p>
       )}
 
-      {matches?.map((match) => {
+      {matches?.map((match, index) => {
         const tender = match.tenders;
         if (!tender) return null;
 
         return (
-          <article className={`match-card${match.viewed_at ? " viewed" : ""}`} key={match.id}>
+          <MatchCard
+            key={match.id}
+            matchId={match.id}
+            status={match.status}
+            statusFilter={statusFilter}
+            index={index}
+            className={`match-card${match.viewed_at ? " viewed" : ""}`}
+          >
             <div className="match-card-header">
               <div>
                 <h3 className="match-title">
@@ -389,25 +396,7 @@ export default async function DashboardPage({
                 <span className={`badge status-${match.status}`}>{match.status}</span>
               </div>
             </div>
-
-            {match.status !== "dismissed" && (
-              <div className="match-actions">
-                {match.status !== "saved" && (
-                  <form action={updateMatchStatus.bind(null, match.id, "saved")}>
-                    <button type="submit">Save</button>
-                  </form>
-                )}
-                {match.status !== "applied" && (
-                  <form action={updateMatchStatus.bind(null, match.id, "applied")}>
-                    <button type="submit">Mark applied</button>
-                  </form>
-                )}
-                <form action={updateMatchStatus.bind(null, match.id, "dismissed")} className="dismiss-button">
-                  <button type="submit">Dismiss</button>
-                </form>
-              </div>
-            )}
-          </article>
+          </MatchCard>
         );
       })}
 

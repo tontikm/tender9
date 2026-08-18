@@ -53,10 +53,35 @@
      not just the marketing pages, so the interior reads as one product. */
   --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
     "Helvetica Neue", var(--font-sans), sans-serif;
+
+  /* Shared motion vocabulary for the app interior. Deliberately short —
+     this is a dashboard people scan daily, so motion should read as
+     responsiveness (did my click register?) rather than as a performance.
+     --ease-snappy matches the curve the marketing page already uses on
+     .m-btn/.m-textlink, so hover/press feel consistent across both. */
+  --ease-snappy: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --duration-fast: 0.15s;
+  --duration-base: 0.22s;
 }
 
 * {
   box-sizing: border-box;
+}
+
+/* A single, broad opt-out: anyone with reduced-motion set gets instant
+   state changes everywhere (transform/opacity-driven press, hover-lift,
+   list entrances, exit animations) without needing every rule below to
+   carry its own guard. Background/border-color transitions are left alone
+   — those aren't the kind of motion this preference is about. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 html {
@@ -220,6 +245,7 @@ a {
   font-size: 13px;
   font-weight: 500;
   color: var(--color-text-muted);
+  transition: background-color var(--duration-fast) ease, color var(--duration-fast) ease;
 }
 
 .site-nav a:hover {
@@ -1221,11 +1247,20 @@ h1 {
   color: var(--color-text-muted);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
+  transition:
+    background-color var(--duration-fast) ease,
+    color var(--duration-fast) ease,
+    border-color var(--duration-fast) ease,
+    transform var(--duration-fast) var(--ease-snappy);
 }
 
 .filters a:hover {
   border-color: var(--color-border-strong);
   color: var(--color-text);
+}
+
+.filters a:active {
+  transform: scale(0.96);
 }
 
 .filters a.active {
@@ -1264,6 +1299,90 @@ h1 {
 .match-card:hover {
   box-shadow: var(--shadow-md);
   border-color: var(--color-border-strong);
+}
+
+/* Entrance for card lists (match/hub cards) — the page arrives rather than
+   snaps in. `backwards` fill-mode holds the 0% state during the delay so
+   later cards don't flash visible before their turn. `:nth-of-type` (not
+   `:nth-child`) since each card is the only <article> under its parent —
+   this counts cards among themselves, ignoring the heading/filter-bar/etc.
+   siblings before them. Capped at the first 8; a long list doesn't get a
+   slower and slower reveal, later cards just join the last wave. */
+@keyframes t9-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.match-card,
+.hub-card {
+  animation: t9-card-in var(--duration-base) var(--ease-snappy) backwards;
+}
+
+.match-card:nth-of-type(2),
+.hub-card:nth-of-type(2) {
+  animation-delay: 30ms;
+}
+.match-card:nth-of-type(3),
+.hub-card:nth-of-type(3) {
+  animation-delay: 60ms;
+}
+.match-card:nth-of-type(4),
+.hub-card:nth-of-type(4) {
+  animation-delay: 90ms;
+}
+.match-card:nth-of-type(5),
+.hub-card:nth-of-type(5) {
+  animation-delay: 120ms;
+}
+.match-card:nth-of-type(6),
+.hub-card:nth-of-type(6) {
+  animation-delay: 150ms;
+}
+.match-card:nth-of-type(7),
+.hub-card:nth-of-type(7) {
+  animation-delay: 180ms;
+}
+.match-card:nth-of-type(n + 8),
+.hub-card:nth-of-type(n + 8) {
+  animation-delay: 210ms;
+}
+
+/* Dashboard match cards are wrapped in this by MatchCard.tsx so
+   Save/Dismiss/Mark applied can animate a card out before it actually
+   leaves the list, instead of it just vanishing on the next render. The
+   1fr -> 0fr grid-template-rows trick animates to/from the content's real
+   height without needing to measure it in JS. The entrance animation
+   (t9-card-in) still runs on the inner .match-card by class, same as
+   everywhere else — only its per-card delay moves to an inline style here
+   (MatchCard.tsx sets it from the list index), since nth-of-type can't see
+   past this wrapper to count the cards among themselves. */
+.match-card-wrap {
+  display: grid;
+  grid-template-rows: 1fr;
+  margin-bottom: 14px;
+  opacity: 1;
+  transition:
+    grid-template-rows var(--duration-base) var(--ease-snappy),
+    opacity var(--duration-base) var(--ease-snappy),
+    margin-bottom var(--duration-base) var(--ease-snappy);
+}
+
+.match-card-wrap > .match-card {
+  min-height: 0;
+  overflow: hidden;
+  margin-bottom: 0;
+}
+
+.match-card-wrap.is-exiting {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  margin-bottom: 0;
 }
 
 /* Already-opened tenders are de-emphasised so unseen ones stand out. */
@@ -1398,12 +1517,30 @@ button,
   cursor: pointer;
   text-decoration: none;
   display: inline-block;
-  transition: background-color 0.12s ease, border-color 0.12s ease;
+  transition:
+    background-color var(--duration-fast) ease,
+    border-color var(--duration-fast) ease,
+    transform var(--duration-fast) var(--ease-snappy);
 }
 
 button:hover,
 .btn:hover {
   background: var(--color-neutral-bg);
+}
+
+/* Tactile press feedback — the single highest-leverage motion change here,
+   since it cascades to every button in the app (Save, Dismiss, Mark
+   applied, form submits, all of it) for free. Skips disabled buttons so a
+   pending action doesn't look interactively pressable. */
+button:active:not(:disabled),
+.btn:active {
+  transform: scale(0.96);
+  transition-duration: 0.05s;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .dismiss-button button {
@@ -1485,6 +1622,7 @@ button:hover,
   text-decoration: none;
   padding: 7px 12px;
   border-radius: var(--radius-sm);
+  transition: background-color var(--duration-fast) ease;
 }
 
 .pagination a:hover {
@@ -2315,7 +2453,7 @@ button:hover,
   height: 20px;
   border-radius: var(--radius-pill);
   background: var(--color-neutral-border);
-  transition: background-color 0.15s ease;
+  transition: background-color var(--duration-base) ease;
   flex-shrink: 0;
 }
 
@@ -2329,7 +2467,10 @@ button:hover,
   border-radius: 50%;
   background: var(--color-surface);
   box-shadow: var(--shadow-sm);
-  transition: transform 0.15s ease;
+  /* A touch of overshoot on the knob reads as a physical flick rather than
+     a flat slide — the one place in this pass that's allowed to feel a
+     little springy, since it's a single small element, not a whole layout. */
+  transition: transform var(--duration-base) cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .profile-toggle input:checked + .profile-toggle-track {
@@ -2408,6 +2549,12 @@ button:hover,
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+/* Used standalone (not nested in .page-nav, which already carries its own
+   bottom margin) on the workspace hub's quick-action row. */
+main > .page-nav-actions {
+  margin-bottom: 24px;
 }
 
 .page-nav-cta.secondary {
