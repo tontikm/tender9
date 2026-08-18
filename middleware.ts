@@ -12,7 +12,15 @@ const AUTH_ONLY_PATHS = ["/login", "/signup"];
 // rather than being bounced to /dashboard for "already being signed in".
 // /browse is here too — raw tender listings are public data, free SEO/
 // credibility, and the tools (matching, workspace, fill, RFQ) stay gated.
-const ALWAYS_PUBLIC_PATHS = ["/privacy", "/forgot-password", "/reset-password", "/auth/reset", "/home", "/browse"];
+const ALWAYS_PUBLIC_PATHS = [
+  "/privacy",
+  "/faq",
+  "/forgot-password",
+  "/reset-password",
+  "/auth/reset",
+  "/home",
+  "/browse",
+];
 
 // A single tender's own page, its document preview, and its calendar file
 // are public for the same reason as /browse — but NOT /tenders/<id>/workspace,

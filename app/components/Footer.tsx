@@ -4,6 +4,7 @@ export function Footer() {
       <div className="site-footer-inner">
         <span>&copy; {new Date().getFullYear()} Tender9</span>
         <span className="site-footer-links">
+          <a href="/faq">FAQ</a>
           <a href="/privacy">Privacy Policy</a>
           <a href="mailto:privacy@tender9.co.za">Contact</a>
         </span>

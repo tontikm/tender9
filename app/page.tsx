@@ -99,25 +99,6 @@ async function getHomeData() {
   };
 }
 
-const FAQS = [
-  {
-    q: "Where does the tender data come from?",
-    a: "Every tender comes straight from National Treasury's official eTenders OCDS feed. It's the same public data South African government departments publish themselves. We don't create, edit, or curate tenders; we monitor them, match them to your business, and help you prepare a bid.",
-  },
-  {
-    q: "How often does it update?",
-    a: "Automatically, once a day. New and updated tenders are pulled in, matched against your profile, and waiting in your dashboard the next time you check.",
-  },
-  {
-    q: "Is Tender9 an official government service?",
-    a: "No. Tender9 is an independent tool, not affiliated with National Treasury or any government department. We simply make their public tender data easier to monitor and act on. Always confirm final requirements against the official tender documents before submitting a bid.",
-  },
-  {
-    q: "What happens to the details I add?",
-    a: "Your company details (registration, tax, B-BBEE, banking, and so on) are stored securely and used only to pre-fill your own copy of official tender forms. They're never shared with third parties beyond the infrastructure providers that host Tender9. Full details in our privacy policy.",
-  },
-];
-
 function TenderRow({ tender }: { tender: ShowcaseTender }) {
   const days = daysUntil(tender.closing_date);
   return (
@@ -350,21 +331,6 @@ export default async function MarketingHomePage() {
               message.
             </p>
           </Reveal>
-        </div>
-      </section>
-
-      {/* ---------- FAQ ---------- */}
-      <section className="m-band">
-        <Reveal>
-          <h2 className="m-h2 m-h2-sm">Questions, answered.</h2>
-        </Reveal>
-        <div className="m-faq">
-          {FAQS.map(({ q, a }) => (
-            <details className="m-faq-item" key={q}>
-              <summary>{q}</summary>
-              <p>{a}</p>
-            </details>
-          ))}
         </div>
       </section>
 
