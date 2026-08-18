@@ -4,6 +4,7 @@ import { IconBuilding, IconTag, IconMapPin, IconCalendar } from "../components/i
 import { formatDate, formatValue } from "@/lib/format";
 import { SA_PROVINCES } from "@/lib/provinces";
 import { saveTenderFromBrowse } from "../actions";
+import { displayTitle } from "@/lib/tender-text";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,7 @@ const BROWSE_PROVINCES = [...SA_PROVINCES, "National"];
 interface TenderRow {
   id: string;
   title: string;
+  description: string | null;
   buyer_name: string | null;
   category: string | null;
   province: string | null;
@@ -83,7 +85,7 @@ export default async function BrowsePage({
     // "planned" uses the query planner's row estimate instead of a full
     // COUNT scan — roughly a second faster on ~1000 open tenders, and an
     // approximate total is fine for a browse pager.
-    .select("id, title, buyer_name, category, province, value_estimate, currency, closing_date", {
+    .select("id, title, description, buyer_name, category, province, value_estimate, currency, closing_date", {
       count: "planned",
     })
     .gte("closing_date", nowIso);
@@ -183,7 +185,7 @@ export default async function BrowsePage({
               <div>
                 <h3 className="match-title">
                   <a href={`/tenders/${tender.id}?from=${encodeURIComponent(currentBrowseUrl)}`}>
-                    {tender.title}
+                    {displayTitle(tender)}
                   </a>
                 </h3>
                 <div className="match-meta">

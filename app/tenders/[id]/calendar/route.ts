@@ -1,10 +1,12 @@
 import { getSupabaseAuthClient, getCurrentUser } from "@/lib/supabase-auth";
 import { extractRequirements } from "@/lib/requirements";
+import { displayTitle } from "@/lib/tender-text";
 
 export const dynamic = "force-dynamic";
 
 interface TenderRow {
   title: string;
+  description: string | null;
   buyer_name: string | null;
   briefing_date: string | null;
   raw_payload: unknown;
@@ -37,7 +39,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const supabase = await getSupabaseAuthClient();
   const { data: tender } = await supabase
     .from("tenders")
-    .select("title, buyer_name, briefing_date, raw_payload")
+    .select("title, description, buyer_name, briefing_date, raw_payload")
     .eq("id", id)
     .maybeSingle<TenderRow>();
 
@@ -71,7 +73,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     `DTSTAMP:${toIcsUtc(new Date().toISOString())}`,
     `DTSTART:${start}`,
     `DTEND:${end}`,
-    `SUMMARY:${icsEscape(`Tender briefing: ${tender.title}`)}`,
+    `SUMMARY:${icsEscape(`Tender briefing: ${displayTitle(tender, 100)}`)}`,
     venue ? `LOCATION:${icsEscape(venue)}` : "",
     `DESCRIPTION:${icsEscape(descriptionParts.join(" "))}`,
     "BEGIN:VALARM",

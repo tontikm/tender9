@@ -3,12 +3,14 @@ import { getSupabaseAuthClient, getCurrentUser } from "@/lib/supabase-auth";
 import { normaliseChecklist, closingInfo } from "@/lib/bid-workspace";
 import { formatDate } from "@/lib/format";
 import { BidWorkspace } from "./BidWorkspace";
+import { displayTitle } from "@/lib/tender-text";
 
 export const dynamic = "force-dynamic";
 
 interface TenderRow {
   id: string;
   title: string;
+  description: string | null;
   buyer_name: string | null;
   closing_date: string | null;
 }
@@ -26,7 +28,11 @@ export default async function WorkspacePage({ params }: { params: Promise<{ id: 
   const userId = user?.id ?? "";
 
   const [{ data: tender }, { data: workspace }, { data: savedFills }, { data: savedRfqRows }] = await Promise.all([
-    supabase.from("tenders").select("id, title, buyer_name, closing_date").eq("id", id).maybeSingle<TenderRow>(),
+    supabase
+      .from("tenders")
+      .select("id, title, description, buyer_name, closing_date")
+      .eq("id", id)
+      .maybeSingle<TenderRow>(),
     supabase
       .from("bid_workspaces")
       .select("checklist, notes")
@@ -77,7 +83,9 @@ export default async function WorkspacePage({ params }: { params: Promise<{ id: 
 
       <h1>Bid workspace</h1>
       <p className="subtitle">
-        {tender.title}
+        {/* Strip a trailing period so it doesn't collide with the " · "
+            separator when a buyer name follows. */}
+        {displayTitle(tender, 110).replace(/\.+$/, "")}
         {tender.buyer_name ? ` · ${tender.buyer_name}` : ""}
       </p>
 

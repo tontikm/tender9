@@ -4,6 +4,7 @@ import { normaliseChecklist, checklistProgress, closingInfo, type ClosingInfo } 
 export interface WorkspaceTender {
   id: string;
   title: string;
+  description: string | null;
   buyer_name: string | null;
   category: string | null;
   province: string | null;
@@ -129,7 +130,7 @@ export async function getWorkspaceEntries(
 
   const { data: tenders } = await supabase
     .from("tenders")
-    .select("id, title, buyer_name, category, province, value_estimate, currency, closing_date")
+    .select("id, title, description, buyer_name, category, province, value_estimate, currency, closing_date")
     .in("id", tenderIds)
     .returns<WorkspaceTender[]>();
 

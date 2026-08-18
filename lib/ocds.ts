@@ -78,7 +78,7 @@ async function fetchWindow(dateFrom: string, dateTo: string): Promise<unknown[]>
 
     if (!Array.isArray(data?.releases)) {
       throw new Error(
-        "Unexpected OCDS API response shape — inspect the raw response and update fetchOcdsReleases()"
+        "Unexpected OCDS API response shape, inspect the raw response and update fetchOcdsReleases()"
       );
     }
 

@@ -1,6 +1,7 @@
 import { getSupabaseAuthClient, getCurrentUser } from "@/lib/supabase-auth";
 import { getWorkspaceEntries, sortWorkspaceEntries, type WorkspaceEntry } from "@/lib/workspace-hub";
 import { formatDate, formatValue } from "@/lib/format";
+import { displayTitle } from "@/lib/tender-text";
 import {
   IconBuilding,
   IconTag,
@@ -126,7 +127,7 @@ export default async function MyWorkspacePage({
                 <div className="hub-card-top">
                   <div>
                     <h3 className="hub-card-title">
-                      <a href={tenderHref(tender.id)}>{tender.title}</a>
+                      <a href={tenderHref(tender.id)}>{displayTitle(tender)}</a>
                     </h3>
                     <div className="match-meta">
                       <span className="meta-item">
