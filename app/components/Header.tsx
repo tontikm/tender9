@@ -11,7 +11,8 @@ export async function Header() {
           <span className="brand-mark">T9</span>
           <span className="brand-name">Tender9</span>
         </a>
-        {user && (
+
+        {user ? (
           <nav className="site-nav">
             <a href="/workspace" className="site-nav-primary">
               My Workspace
@@ -27,6 +28,20 @@ export async function Header() {
                 Sign out
               </button>
             </form>
+          </nav>
+        ) : (
+          /* Signed-out visitors previously got no nav at all, which left the
+             public pages with no route to sign in or sign up from the header. */
+          <nav className="site-nav">
+            {/* Hidden on the narrowest screens, where the header can't fit
+                three items — the hero and closing bands both link to Browse. */}
+            <a href="/browse" className="site-nav-hide-sm">
+              Browse tenders
+            </a>
+            <a href="/login">Sign in</a>
+            <a href="/signup" className="site-nav-cta">
+              Start free
+            </a>
           </nav>
         )}
       </div>
